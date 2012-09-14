@@ -171,39 +171,54 @@ int main() {
         print_tuple(z);
     }
 
+    five_int five_k(9,8,7,6,5);
+    five_int five_v(0,1,2,3,4);
+    five_int five_k_s = five_k;
+    five_int five_v_s = five_v;
+    oet_sort_by_key(five_k_s, five_v_s);
+    print_tuple(five_k_s);
+    print_tuple(five_v_s);
+    five_k_s = five_k;
+    five_v_s = five_v;
+    bubble_sort_by_key(five_k_s, five_v_s);
+    print_tuple(five_k_s);
+    print_tuple(five_v_s);
+ 
     int n_blocks = 15 * 8 * 100;
     int block_size = 256;
     thrust::device_vector<int> r(n_blocks * block_size);
-
+    int iterations = 1;
     cudaEvent_t start,stop;
     float time=0;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
-
-    test_oet<<<n_blocks, block_size>>>(five_int(3,2,5,6,4),
-                                       five_int(5,3,2,7,4),
-                                       thrust::raw_pointer_cast(r.data()));
-    
+    for (int i = 0; i < iterations; i++) {
+        test_oet<<<n_blocks, block_size>>>(five_k,
+                                           five_v,
+                                           thrust::raw_pointer_cast(r.data()));
+    }
     
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time, start, stop);
+    time = time / (float)iterations;
     std::cout << "  Time: " << time << " ms" << std::endl;
     float kps = (float)n_blocks * block_size * 5  / (time*1000);
     std::cout << "  Throughput: " << kps << " Mkeys/s" << std::endl
               << std::endl;
 
     cudaEventRecord(start, 0);
-
-    test_bubble<<<n_blocks, block_size>>>(five_int(3,2,5,6,4),
-                                          five_int(5,3,2,7,4),
-                                          thrust::raw_pointer_cast(r.data()));
-    
+    for(int i = 0; i < iterations; i++) {
+        test_bubble<<<n_blocks, block_size>>>(five_k,
+                                              five_v,
+                                              thrust::raw_pointer_cast(r.data()));
+    }
     
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time, start, stop);
+    time = time / (float)iterations;
     std::cout << "  Time: " << time << " ms" << std::endl;
     kps = (float)n_blocks * block_size * 5  / (time*1000);
     std::cout << "  Throughput: " << kps << " Mkeys/s" << std::endl
