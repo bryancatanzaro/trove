@@ -2,299 +2,51 @@
 #include <iostream>
 #include "oet.h"
 #include "bubble.h"
-
-/*! \p cons_type is a metafunction that computes the
- * <tt>thrust::detail::cons</tt> type for a <tt>thrust::tuple</tt>
- */
-template<typename Tuple>
-struct cons_type {
-    typedef thrust::detail::cons<
-        typename Tuple::head_type,
-        typename Tuple::tail_type> type;
-};
-
-template<int N, typename T>
-struct homogeneous_tuple {
-    typedef thrust::detail::cons<
-        T, typename homogeneous_tuple<N-1, T>::type> type;
-};
-
-template<typename T>
-struct homogeneous_tuple<0, T> {
-    typedef thrust::null_type type;
-};
-
-
-// template<typename Tuple>
-// struct update_tuple_impl{};
-
-// template<typename HT, typename TT>
-// struct update_tuple_impl<thrust::detail::cons<HT, TT> > {
-//     __host__ __device__
-//     static void impl(thrust::detail::cons<HT, TT>& tup, const HT& d, int idx) {
-//         if(idx == 0) tup.get_head() = d;
-//         update_tuple_impl<TT>::impl(tup.get_tail(), d, idx-1);
-//     }
-// };
-
-// template<>
-// struct update_tuple_impl<thrust::null_type> {
-//     template<typename T>
-//     __host__ __device__
-//     static void impl(thrust::null_type, T, int) {}
-// };
-
-// template<typename Tuple, typename T>
-// __host__ __device__
-// void update_tuple(Tuple& tup, const T& d, int idx) {
-//     update_tuple_impl<typename cons_type<Tuple>::type>::impl(tup, d, idx);
-// }
-
+#include "transpose.h"
+#include "memory.h"
 #include <thrust/device_vector.h>
 
-template<typename T>
-struct print_tuple_helper{};
-
-template<typename HT, typename TT>
-struct print_tuple_helper<thrust::detail::cons<HT, TT> > {
-    static void impl(const thrust::detail::cons<HT, TT>& a) {
-        std::cout << a.get_head() << " ";
-        print_tuple_helper<TT>::impl(a.get_tail());
-    }
-};
-
-template<>
-struct print_tuple_helper<thrust::null_type> {
-    static void impl(thrust::null_type) {
-        std::cout << std::endl;
-    }
-};
-
-template<typename Tuple>
-__host__
-void print_tuple(const Tuple& a) {
-    print_tuple_helper<typename cons_type<Tuple>::type>::impl(a);
-}
-
-template<typename Tuple>
-__global__ void test(Tuple t, int d, int i, Tuple* r) {
-    update_tuple(t, d, i);
-    *r = t;
-}
-
-
-template<int s>
-struct offset_constants{};
-
-// This Python code computes the necessary magic constants for arbitrary sizes
-// m: Number of elements per thread
-// n: Number of threads per warp
-//
-// def offset(m, n):
-//     for i in range(m):
-//         val = n * i
-//         if (n * i) % m == 1:
-//             return val / m
-
-// def permute(m, n):
-//     o = offset(m, n)
-//     return m-((n-1)/o+1)
-        
-template<>
-struct offset_constants<5> {
-    static const int offset=19;
-    static const int permute=3;
-};
-
-template<>
-struct offset_constants<7> {
-    static const int offset=9;
-    static const int permute=3;
-};
-
-template<>
-struct offset_constants<9> {
-    static const int offset=7;
-    static const int permute=4;
-};
-
-#define WARP_SIZE 32
-#define WARP_MASK 0x1f
-
-template<typename IntTuple, int b, int o>
-struct compute_offsets_impl{};
-
-template<typename HT, typename TT, int b, int o>
-struct compute_offsets_impl<thrust::detail::cons<HT, TT>, b, o> {
-    typedef thrust::detail::cons<HT, TT> Tuple;
-    __device__
-    static Tuple impl(int offset) {
-        if (offset >= b) {
-            offset -= b;
-        } //Poor man's x % b. Requires that o < b.
-        return Tuple(offset,
-                     compute_offsets_impl<TT, b, o>::
-                     impl(offset + o));
-    }
-};
-
-template<int b, int o>
-struct compute_offsets_impl<thrust::null_type, b, o> {
-    __device__
-    static thrust::null_type impl(int) {
-        return thrust::null_type();
-    }
-};
-
-template<int m>
-__device__
-typename homogeneous_tuple<m, int>::type compute_offsets() {
-    typedef offset_constants<m> constants;
-    typedef typename homogeneous_tuple<m, int>::type result_type;
-    int warp_id = threadIdx.x & WARP_MASK;
-    int initial_offset = ((WARP_SIZE - warp_id) * constants::offset)
-        & WARP_MASK;
-    return compute_offsets_impl<result_type,
-                                WARP_SIZE,
-                                constants::offset>::impl(initial_offset);
-}
-        
-template<int m>
-__device__
-typename homogeneous_tuple<m, int>::type compute_permute() {
-    typedef offset_constants<m> constants;
-    typedef typename homogeneous_tuple<m, int>::type result_type;
-    int warp_id = threadIdx.x & WARP_MASK;
-    int initial_offset = ((m - constants::permute) * warp_id) % m;
-    return compute_offsets_impl<result_type,
-                                m, constants::permute>::impl(initial_offset);
-}
-
-template<typename T>
-struct counting_tuple{};
-
-template<typename HT, typename TT>
-struct counting_tuple<thrust::detail::cons<HT, TT> > {
-    typedef thrust::detail::cons<HT, TT> Tuple;
-    __host__ __device__
-    static Tuple impl(HT v=0, HT i=1) {
-        return Tuple(v,
-                     counting_tuple<TT>::impl(v + i));
-    }
-};
-
-template<>
-struct counting_tuple<thrust::null_type> {
-    template<typename T>
-    __host__ __device__
-    static thrust::null_type impl(T v=0, T i=1) {
-        return thrust::null_type();
-    }
-};
-
-template<typename Data, typename Indices>
-struct transpose_warp_tuples {};
-
-template<typename DHT, typename DTT, typename IHT, typename ITT>
-struct transpose_warp_tuples<
-    thrust::detail::cons<DHT, DTT>,
-    thrust::detail::cons<IHT, ITT> > {
-    __device__ static void impl(thrust::detail::cons<DHT, DTT>& d,
-                                const thrust::detail::cons<IHT, ITT>& i) {
-        d.get_head() = __shfl(d.get_head(), i.get_head());
-        transpose_warp_tuples<DTT, ITT>::impl(d.get_tail(),
-                                              i.get_tail());
-    }
-};
-
-template<>
-struct transpose_warp_tuples<
-    thrust::null_type, thrust::null_type> {
-    __device__ static void impl(thrust::null_type, thrust::null_type) {}
-};
-
-template<typename Tuple>
-struct store_tuple {};
-
-template<typename HT, typename TT>
-struct store_tuple<thrust::detail::cons<HT, TT> > {
-    __host__ __device__ static void impl(
-        const thrust::detail::cons<HT, TT>& d,
-        HT* ptr, int offset, int stride) {
-        ptr[offset] = d.get_head();
-        store_tuple<TT>::impl(d.get_tail(), ptr, offset + stride, stride);
-    }
-};
-
-template<>
-struct store_tuple<thrust::null_type> {
-    template<typename T>
-    __host__ __device__ static void impl(
-        thrust::null_type, T*, int, int) {}
-};
+using namespace tuple_suite;
 
 template<typename Value>
 __global__ void test_transpose_indices(Value* r) {
     int global_index = threadIdx.x;
-    Value warp_offsets = compute_offsets<thrust::tuple_size<Value>::value>();
-    Value tuple_indices = compute_permute<thrust::tuple_size<Value>::value>();
-    r[global_index] = tuple_indices;
+    Value warp_offsets;
+    int rotation;
+    compute_indices(warp_offsets, rotation);
+    r[global_index] = warp_offsets;
 }
 
 template<int size, typename T>
 __global__ void test_transpose(T* r) {
     typedef typename homogeneous_tuple<size, T>::type Value;
-    
+    typedef typename homogeneous_tuple<size, int>::type Indices;
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
-    Value warp_offsets = compute_offsets<thrust::tuple_size<Value>::value>();
-    Value permutation = compute_permute<thrust::tuple_size<Value>::value>();
-    
-    Value data = counting_tuple<Value>::impl(
-       global_index * size);
 
-    transpose_warp_tuples<Value, Value>::impl(data, warp_offsets);
-    oet_sort_by_key(permutation, data);
+    Indices warp_offsets;
+    int rotation;
+    compute_indices(warp_offsets, rotation);
+
+    Value data;
+    data = counting_tuple<Value>::impl(
+        global_index * size);
+    
+    for(int i = 0; i < 1; i++) {
+        warp_transpose(data, warp_offsets, rotation);
+    }
     int warp_begin = threadIdx.x & (~WARP_MASK);
     int warp_idx = threadIdx.x & WARP_MASK;
     int warp_offset = (blockDim.x * blockIdx.x + warp_begin) * size;
     T* warp_ptr = r + warp_offset;
-    store_tuple<Value>::impl(data, warp_ptr, warp_idx, 32);
+    warp_store(data, warp_ptr, warp_idx, 32);
 }
 
 
-template<typename T>
-struct uncoalesced_store_tuple{};
 
-template<typename HT, typename TT>
-struct uncoalesced_store_tuple<thrust::detail::cons<HT, TT> > {
-    __host__ __device__ static void impl(
-        const thrust::detail::cons<HT, TT>& d,
-        HT* ptr,
-        int offset=0) {
-        ptr[offset] = d.get_head();
-        uncoalesced_store_tuple<TT>::impl(d.get_tail(), ptr, offset+1);
-    }
-    __host__ __device__ static void impl(
-        const thrust::detail::cons<HT, TT>& d,
-        volatile HT* ptr,
-        int offset=0) {
-        ptr[offset] = d.get_head();
-        uncoalesced_store_tuple<TT>::impl(d.get_tail(), ptr, offset+1);
-    }
-};
 
-template<>
-struct uncoalesced_store_tuple<thrust::null_type> {
-    template<typename T>
-    __host__ __device__ static void impl(
-        thrust::null_type, T*, int) {}
-    template<typename T>
-    __host__ __device__ static void impl(
-        thrust::null_type, volatile T*, int) {}
-};
 
 template<int size, typename T>
-__global__ void test_uncoalesced_write(T* r) {
+__global__ void test_uncoalesced_store(T* r) {
     
     typedef typename homogeneous_tuple<size, T>::type Value;
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
@@ -303,8 +55,10 @@ __global__ void test_uncoalesced_write(T* r) {
         global_index * size);
     
     T* thread_ptr = r + global_index * size;
-    uncoalesced_store_tuple<Value>::impl(data, thread_ptr);
+    uncoalesced_store(data, thread_ptr);
 }
+
+
 
 template<int size, typename T>
 __global__ void test_shared_transpose(T* r) {
@@ -314,16 +68,25 @@ __global__ void test_shared_transpose(T* r) {
     int work_per_thread = thrust::tuple_size<Value>::value;
     extern __shared__ T smem[];
     
-    Value data = counting_tuple<Value>::impl(
+    Value data;
+    data = counting_tuple<Value>::impl(
         global_index * work_per_thread);
-    
-    T* thread_ptr = smem + threadIdx.x * work_per_thread;
-    uncoalesced_store_tuple<Value>::impl(data, thread_ptr);
-    __syncthreads();
-    T* block_ptr = r + blockDim.x * blockIdx.x * work_per_thread;
-    for(int i = threadIdx.x; i < work_per_thread * blockDim.x; i += blockDim.x) {
-        block_ptr[i] = smem[i];
+    int warp_id = threadIdx.x >> 5;
+    int warp_idx = threadIdx.x & WARP_MASK;
+
+    for(int i = 0; i < 1; i++) {
+        volatile T* thread_ptr = smem + threadIdx.x * work_per_thread;
+        uncoalesced_store(data, thread_ptr);
+
+
+        data = warp_load<Value>(smem + warp_id * WARP_SIZE * size,
+                                warp_idx);
     }
+    int warp_begin = threadIdx.x & (~WARP_MASK);
+    int warp_offset = (blockDim.x * blockIdx.x + warp_begin) * size;
+    T* warp_ptr = r + warp_offset;
+    warp_store(data, warp_ptr, warp_idx, 32);
+   
 }
 
 
@@ -384,6 +147,9 @@ void verify(thrust::device_vector<T>& d_r) {
         std::cout << "Pass!" << std::endl;
     }
 }
+
+#define ARITY 7
+
 int main() {
 
     typedef typename homogeneous_tuple<5, int>::type five_int;
@@ -400,9 +166,10 @@ int main() {
 
 
     int n_blocks = 15 * 8 * 100;
+    //int n_blocks = 1;
     int block_size = 256;
 
-    thrust::device_vector<int> e(n_blocks*block_size*5);
+    thrust::device_vector<int> e(n_blocks*block_size*ARITY);
 
     // typedef typename homogeneous_tuple<5, int>::type n_int;
     // thrust::device_vector<n_int> f(32);
@@ -415,16 +182,20 @@ int main() {
     // }
 
 
-    test_transpose<5><<<n_blocks, block_size>>>(
+    test_transpose<ARITY><<<n_blocks, block_size>>>(
         thrust::raw_pointer_cast(e.data()));
     verify(e);
-    test_uncoalesced_write<5><<<n_blocks, block_size>>>(
+    thrust::fill(e.begin(), e.end(), 0);
+    test_uncoalesced_store<ARITY><<<n_blocks, block_size>>>(
         thrust::raw_pointer_cast(e.data()));
     verify(e);
-    test_shared_transpose<5><<<n_blocks, block_size,
-        sizeof(int) * 5 * block_size>>>(
+    thrust::fill(e.begin(), e.end(), 0);
+    test_shared_transpose<ARITY><<<n_blocks, block_size,
+        sizeof(int) * ARITY * block_size>>>(
             thrust::raw_pointer_cast(e.data()));
     verify(e);
+    thrust::fill(e.begin(), e.end(), 0);
+
     // five_int five_k = thrust::make_tuple(9,8,7,6,5);
     // five_int five_v = thrust::make_tuple(0,1,2,3,4);
     // five_int five_k_s = five_k;

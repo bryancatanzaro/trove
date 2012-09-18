@@ -1,7 +1,9 @@
 #pragma once
 #include <thrust/tuple.h>
 #include <thrust/swap.h>
-#include <iostream>
+
+namespace tuple_suite {
+namespace detail {
 
 template<typename Key, typename Value, int top_index, int bottom_index>
 struct oet_sbk_step;
@@ -84,11 +86,14 @@ struct oet_sbk_level {
     }
 };
 
-/*! Sorts a key, value tuple pair */
+} //end namespace detail
+
+/*! Sorts a key, value tuple pair using odd-even transposition sort */
 template<typename Key, typename Value>
 __host__ __device__
 void oet_sort_by_key(Key& k, Value& v) {
-    oet_sbk_level<Key, Value, 0, thrust::tuple_size<Key>::value-1>
+    detail::oet_sbk_level<Key, Value, 0, thrust::tuple_size<Key>::value-1>
         ::impl(k, v);
 };
 
+}

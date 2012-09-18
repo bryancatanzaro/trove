@@ -3,6 +3,9 @@
 #include <thrust/swap.h>
 #include <iostream>
 
+namespace tuple_suite {
+namespace detail {
+
 template<typename Key, typename Value, int top_index, int bottom_index>
 struct bubble_sbk_step;
 
@@ -93,11 +96,14 @@ struct bubble_sbk_level {
     }
 };
 
-/*! Sorts a key, value tuple pair */
+} //ends namespace detail
+
+/*! Sorts a key, value tuple pair using bubble sort */
 template<typename Key, typename Value>
 __host__ __device__
 void bubble_sort_by_key(Key& k, Value& v) {
-    bubble_sbk_level<Key, Value, 0, thrust::tuple_size<Key>::value-1>
+    detail::bubble_sbk_level<Key, Value, 0, thrust::tuple_size<Key>::value-1>
         ::impl(k, v);
 };
 
+} //ends namespace tuple_suite
