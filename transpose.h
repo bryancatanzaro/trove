@@ -136,22 +136,22 @@ typename homogeneous_tuple<m, int>::type compute_offsets() {
 }
 
 template<typename Data, typename Indices>
-struct transpose_warp_tuples {};
+struct warp_shuffle {};
 
 template<typename DHT, typename DTT, typename IHT, typename ITT>
-struct transpose_warp_tuples<
+struct warp_shuffle<
     thrust::detail::cons<DHT, DTT>,
     thrust::detail::cons<IHT, ITT> > {
     __device__ static void impl(thrust::detail::cons<DHT, DTT>& d,
                                 const thrust::detail::cons<IHT, ITT>& i) {
         d.get_head() = __shfl(d.get_head(), i.get_head());
-        transpose_warp_tuples<DTT, ITT>::impl(d.get_tail(),
+        warp_shuffle<DTT, ITT>::impl(d.get_tail(),
                                               i.get_tail());
     }
 };
 
 template<>
-struct transpose_warp_tuples<
+struct warp_shuffle<
     thrust::null_type, thrust::null_type> {
     __device__ static void impl(thrust::null_type, thrust::null_type) {}
 };
@@ -178,7 +178,7 @@ __device__ void warp_transpose(Tuple& src,
     typedef typename
         homogeneous_tuple<thrust::tuple_size<Tuple>::value, int>::type
         IntTuple;
-    detail::transpose_warp_tuples<Tuple, IntTuple>::impl(src, indices);
+    detail::warp_shuffle<Tuple, IntTuple>::impl(src, indices);
     src = rotate(detail::tx_permute(src), rotation);
 }
 
