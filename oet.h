@@ -2,7 +2,7 @@
 #include <thrust/tuple.h>
 #include <thrust/swap.h>
 
-namespace tuple_suite {
+namespace trove {
 namespace detail {
 
 template<typename Key, typename Value, int top_index, int bottom_index>
@@ -96,4 +96,4 @@ void oet_sort_by_key(Key& k, Value& v) {
         ::impl(k, v);
 };
 
-}
+} //end namespace trove

@@ -1,7 +1,7 @@
 #pragma once
 #include <thrust/tuple.h>
 
-namespace tuple_suite {
+namespace trove {
 
 /*! \p cons_type is a metafunction that computes the
  * <tt>thrust::detail::cons</tt> type for a <tt>thrust::tuple</tt>

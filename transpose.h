@@ -2,7 +2,7 @@
 #include "utility.h"
 #include "rotate.h"
 
-namespace tuple_suite {
+namespace trove {
 namespace detail {
 
 template<int s>

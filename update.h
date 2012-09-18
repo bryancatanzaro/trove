@@ -1,7 +1,7 @@
 #pragma once
 #include "utility.h"
 
-namespace tuple_suite {
+namespace trove {
 namespace detail {
 
 template<typename Tuple>

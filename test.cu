@@ -6,7 +6,7 @@
 #include "memory.h"
 #include <thrust/device_vector.h>
 
-using namespace tuple_suite;
+using namespace trove;
 
 template<typename Value>
 __global__ void test_transpose_indices(Value* r) {

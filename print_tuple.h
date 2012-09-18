@@ -1,7 +1,7 @@
 #pragma once
 #include <iostream>
 
-namespace tuple_suite {
+namespace trove {
 namespace detail {
 
 template<typename T>
@@ -30,4 +30,4 @@ void print_tuple(const Tuple& a) {
     print_tuple_helper<typename cons_type<Tuple>::type>::impl(a);
 }
 
-} //ends namespace tuple_suite
+} //ends namespace trove

@@ -1,7 +1,7 @@
 #pragma once
 #include <thrust/tuple.h>
 
-namespace tuple_suite {
+namespace trove {
 namespace detail {
 
 template<typename Tuple, int i, int j=0>
@@ -87,4 +87,4 @@ Tuple rotate(const Tuple& t, int a) {
     return detail::rotate_impl<Tuple, 1>::impl(t, a);
 }
 
-} //ends namespace tuple_suite
+} //ends namespace trove

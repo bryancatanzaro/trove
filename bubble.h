@@ -3,7 +3,7 @@
 #include <thrust/swap.h>
 #include <iostream>
 
-namespace tuple_suite {
+namespace trove {
 namespace detail {
 
 template<typename Key, typename Value, int top_index, int bottom_index>
@@ -106,4 +106,4 @@ void bubble_sort_by_key(Key& k, Value& v) {
         ::impl(k, v);
 };
 
-} //ends namespace tuple_suite
+} //ends namespace trove
