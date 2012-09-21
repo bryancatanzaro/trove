@@ -1,6 +1,7 @@
 #pragma once
 #include "utility.h"
 #include "rotate.h"
+#include "shfl.h"
 
 #define WARP_SIZE 32
 #define WARP_MASK 0x1f
@@ -64,7 +65,7 @@ struct offset_constants<9> {
 
 template<int m>
 struct power_of_two_constants {
-    static const int offset = WARP_SIZE - 2; 
+    static const int offset = WARP_SIZE - WARP_SIZE/m; 
     static const int permute = m - 1;
 };
 
@@ -271,12 +272,14 @@ __device__ void warp_transpose(Tuple& src,
                                const typename homogeneous_tuple<
                                    thrust::tuple_size<Tuple>::value,
                                    int>::type& indices,
-                               int rotation) {
+                               int rotation) {    
     typedef typename
         homogeneous_tuple<thrust::tuple_size<Tuple>::value, int>::type
         IntTuple;
-    detail::warp_shuffle<Tuple, IntTuple>::impl(src, indices);
-    src = rotate(detail::tx_permute(src), rotation);
+    detail::warp_transpose_impl<
+        Tuple, IntTuple,
+        is_power_of_two<thrust::tuple_size<Tuple>::value>::value>::
+        impl(src, indices, rotation);
 }
 
 }

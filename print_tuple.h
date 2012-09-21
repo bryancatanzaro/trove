@@ -27,7 +27,7 @@ struct print_tuple_helper<thrust::null_type> {
 template<typename Tuple>
 __host__
 void print_tuple(const Tuple& a) {
-    print_tuple_helper<typename cons_type<Tuple>::type>::impl(a);
+    detail::print_tuple_helper<typename cons_type<Tuple>::type>::impl(a);
 }
 
 } //ends namespace trove

@@ -4,6 +4,7 @@
 #include "bubble.h"
 #include "transpose.h"
 #include "memory.h"
+#include "print_tuple.h"
 #include <thrust/device_vector.h>
 
 using namespace trove;
@@ -14,7 +15,13 @@ __global__ void test_transpose_indices(Value* r) {
     Value warp_offsets;
     int rotation;
     compute_indices(warp_offsets, rotation);
-    r[global_index] = warp_offsets;
+    //r[global_index] = warp_offsets;
+    Value data;
+    data = counting_tuple<Value>::impl(
+        global_index * thrust::tuple_size<Value>::value);
+    
+    warp_transpose(data, warp_offsets, rotation);
+    r[global_index] = data;
 }
 
 template<int size, typename T>
@@ -148,7 +155,7 @@ void verify(thrust::device_vector<T>& d_r) {
     }
 }
 
-#define ARITY 4
+#define ARITY 8
 
 int main() {
 
@@ -168,14 +175,14 @@ int main() {
     int n_blocks = 15 * 8 * 100;
     //int n_blocks = 1;
     int block_size = 256;
-
+    //it block_size = 32;
     thrust::device_vector<int> e(n_blocks*block_size*ARITY);
 
-    // typedef typename homogeneous_tuple<5, int>::type n_int;
-    // thrust::device_vector<n_int> f(32);
-    // test_transpose_indices<<<1, 32>>>(
+    // typedef typename homogeneous_tuple<ARITY, int>::type n_int;
+    // thrust::device_vector<n_int> f(64);
+    // test_transpose_indices<<<1, 64>>>(
     //     thrust::raw_pointer_cast(f.data()));
-    // for(int i = 0; i < 32; i++) {
+    // for(int i = 0; i < 64; i++) {
     //     n_int z = f[i];
     //     std::cout << i << ": ";
     //     print_tuple(z);
@@ -194,7 +201,7 @@ int main() {
         sizeof(int) * ARITY * block_size>>>(
             thrust::raw_pointer_cast(e.data()));
     verify(e);
-    thrust::fill(e.begin(), e.end(), 0);
+    // thrust::fill(e.begin(), e.end(), 0);
 
     // five_int five_k = thrust::make_tuple(9,8,7,6,5);
     // five_int five_v = thrust::make_tuple(0,1,2,3,4);
