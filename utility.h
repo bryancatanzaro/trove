@@ -47,4 +47,40 @@ struct counting_tuple<thrust::null_type> {
     }
 };
 
+template<int m>
+struct static_log {
+    static const int value = 1 + static_log<m >> 1>::value;
+};
+
+template<>
+struct static_log<1> {
+    static const int value = 0;
+};
+
+template<>
+struct static_log<0> {
+    //This functions as a static assertion
+    //Don't take the log of 0!!
+};
+
+template<int m>
+struct static_bit_sum {
+    static const int value = (m & 1) + static_bit_sum<m >> 1>::value;
+};
+
+template<>
+struct static_bit_sum<0> {
+    static const int value = 0;
+};
+
+template<int m>
+struct is_power_of_two {
+    static const bool value = static_bit_sum<m>::value == 1;
+};
+
+template<>
+struct is_power_of_two<0> {
+    static const bool value = false;
+};
+
 }

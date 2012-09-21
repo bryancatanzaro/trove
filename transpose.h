@@ -2,13 +2,18 @@
 #include "utility.h"
 #include "rotate.h"
 
+#define WARP_SIZE 32
+#define WARP_MASK 0x1f
+#define LOG_WARP_SIZE 5
+
 namespace trove {
 namespace detail {
 
 template<int s>
 struct offset_constants{};
 
-// This Python code computes the necessary magic constants for arbitrary sizes
+// This Python code computes the necessary magic constants for
+// arbitrary odd sizes
 // m: Number of elements per thread
 // n: Number of threads per warp
 //
@@ -57,6 +62,29 @@ struct offset_constants<9> {
     static const int rotate=2;
 };
 
+template<int m>
+struct power_of_two_constants {
+    static const int offset = WARP_SIZE - 2; 
+    static const int permute = m - 1;
+};
+
+template<>
+struct offset_constants<2> {
+    static const int offset = power_of_two_constants<2>::offset;
+    static const int permute = power_of_two_constants<2>::permute;
+};
+
+template<>
+struct offset_constants<4> {
+    static const int offset = power_of_two_constants<4>::offset;
+    static const int permute = power_of_two_constants<4>::permute;
+};
+
+template<>
+struct offset_constants<8> {
+    static const int offset = power_of_two_constants<8>::offset;
+    static const int permute = power_of_two_constants<8>::permute;
+};
 
 template<typename T, int size, int position=0>
 struct tx_permute_impl{};
@@ -94,8 +122,6 @@ __host__ __device__ Tuple tx_permute(const Tuple& t) {
 
 
 
-#define WARP_SIZE 32
-#define WARP_MASK 0x1f
 
 template<typename IntTuple, int b, int o>
 struct compute_offsets_impl{};
@@ -122,14 +148,35 @@ struct compute_offsets_impl<thrust::null_type, b, o> {
     }
 };
 
+template<int m, bool power_of_two>
+struct compute_initial_offset {
+    typedef offset_constants<m> constants;
+    __device__ static int impl() {
+        int warp_id = threadIdx.x & WARP_MASK;
+        int initial_offset = ((WARP_SIZE - warp_id) * constants::offset)
+            & WARP_MASK;
+        return initial_offset;
+    }
+};
+
 template<int m>
+struct compute_initial_offset<m, true> {
+    __device__ static int impl() {
+        int warp_id = threadIdx.x & WARP_MASK;
+        int initial_offset = ((warp_id * (WARP_SIZE + 1)) >>
+                              static_log<m>::value)
+            & WARP_MASK;
+        return initial_offset;
+    }
+};
+
+
+template<int m, bool power_of_two>
 __device__
 typename homogeneous_tuple<m, int>::type compute_offsets() {
     typedef offset_constants<m> constants;
     typedef typename homogeneous_tuple<m, int>::type result_type;
-    int warp_id = threadIdx.x & WARP_MASK;
-    int initial_offset = ((WARP_SIZE - warp_id) * constants::offset)
-        & WARP_MASK;
+    int initial_offset = compute_initial_offset<m, power_of_two>::impl();
     return compute_offsets_impl<result_type,
                                 WARP_SIZE,
                                 constants::offset>::impl(initial_offset);
@@ -156,17 +203,67 @@ struct warp_shuffle<
     __device__ static void impl(thrust::null_type, thrust::null_type) {}
 };
 
+
+template<typename IntTuple, bool is_power_of_two>
+struct compute_indices_impl {
+    __device__ static void impl(IntTuple& indices, int& rotation) {
+        indices =
+            detail::compute_offsets<thrust::tuple_size<IntTuple>::value,
+                                    false>();
+        int warp_id = threadIdx.x & WARP_MASK;
+        int size = thrust::tuple_size<IntTuple>::value;
+        int r =
+            detail::offset_constants
+            <thrust::tuple_size<IntTuple>::value>::rotate;
+        rotation = (warp_id * r) % size;
+    }
+};
+
+template<typename IntTuple>
+struct compute_indices_impl<IntTuple, true> {
+    __device__ static void impl(IntTuple& indices, int& rotation) {
+        indices =
+            detail::compute_offsets<thrust::tuple_size<IntTuple>::value,
+                                    true>();
+        int warp_id = threadIdx.x & WARP_MASK;
+        int size = thrust::tuple_size<IntTuple>::value;
+        rotation = (size - warp_id) & (size - 1);
+    }
+};
+
+template<typename Tuple, typename IntTuple, bool is_power_of_two>
+struct warp_transpose_impl {
+    __device__ static void impl(Tuple& src,
+                                const IntTuple& indices,
+                                const int& rotation) {
+        detail::warp_shuffle<Tuple, IntTuple>::impl(src, indices);
+        src = rotate(detail::tx_permute(src), rotation);
+    }
+};
+
+template<typename Tuple, typename IntTuple>
+struct warp_transpose_impl<Tuple, IntTuple, true> {
+    __device__ static void impl(Tuple& src,
+                                const IntTuple& indices,
+                                const int& rotation) {
+        int warp_id = threadIdx.x & WARP_MASK;
+        int pre_rotation = warp_id >>
+            (LOG_WARP_SIZE -
+             static_log<thrust::tuple_size<Tuple>::value>::value);
+        src = rotate(src, pre_rotation);        
+        warp_transpose_impl<Tuple, IntTuple, false>::impl
+            (src, indices, rotation);
+    }
+};
+
 } //end namespace detail
 
 template<typename IntTuple>
 __device__ void compute_indices(IntTuple& indices, int& rotation) {
-    indices =
-        detail::compute_offsets<thrust::tuple_size<IntTuple>::value>();
-    int warp_id = threadIdx.x & WARP_MASK;
-    int size = thrust::tuple_size<IntTuple>::value;
-    int r =
-        detail::offset_constants<thrust::tuple_size<IntTuple>::value>::rotate;
-    rotation = (warp_id * r) % size;
+    detail::compute_indices_impl<
+        IntTuple,
+        is_power_of_two<thrust::tuple_size<IntTuple>::value>::value>
+        ::impl(indices, rotation);
 }
 
 template<typename Tuple>

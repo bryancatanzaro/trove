@@ -148,7 +148,7 @@ void verify(thrust::device_vector<T>& d_r) {
     }
 }
 
-#define ARITY 7
+#define ARITY 4
 
 int main() {
 
