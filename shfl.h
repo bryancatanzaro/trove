@@ -1,57 +1,48 @@
 #pragma once
-#include <thrust/tuple.h>
-
-#ifdef _MSC_VER
-//In MS-land, long is only 32 bits.
-#define sixty_four long long;
-#else
-#define sixty_four long
-#endif
 
 namespace trove {
 namespace detail {
 
-struct two_int {
-    int a;
-    int b;
+template<typename T>
+struct size_in_ints {
+    static const int value = (sizeof(T) - 1)/sizeof(int) + 1;
 };
 
-
+template<typename T, int s>
 union dismember {
-    unsigned sixty_four m_ulong;
-    sixty_four m_long;
-    double m_double;
-    two_int m_ints;
+    T d;
+    int i[s];
 };
 
+
+template<int s>
+struct shuffle {
+    __device__
+    static void impl(int d[s], const int& i) {
+        d[0] = __shfl(d[0], i);
+        shuffle<s-1>::impl(d+1, i);
+    }
+};
+
+template<>
+struct shuffle<1> {
+    __device__
+    static void impl(int d[1], const int& i) {
+        d[0] = __shfl(d[0], i);
+    }
+};
+ 
 }
 }
 
-//Overloads for the built-in __shfl intrinsic
-
+template<typename T>
 __device__
-double __shfl(double in, int idx) {
-    union trove::detail::dismember x;
-    x.m_double = in;
-    x.m_ints.a = __shfl(x.m_ints.a, idx);
-    x.m_ints.b = __shfl(x.m_ints.b, idx);
-    return x.m_double;
+T __shfl(const T& t, const int& i) {
+  union trove::detail::dismember<T,
+    trove::detail::size_in_ints<T>::value> cleaver;
+    cleaver.d = t;
+    trove::detail::shuffle<trove::detail::size_in_ints<T>::value>
+      ::impl(cleaver.i, i);
+    return cleaver.d;
 }
 
-__device__
-sixty_four __shfl(sixty_four in, int idx) {
-    union trove::detail::dismember x;
-    x.m_long = in;
-    x.m_ints.a = __shfl(x.m_ints.a, idx);
-    x.m_ints.b = __shfl(x.m_ints.b, idx);
-    return x.m_long;
-}
-
-__device__
-unsigned sixty_four __shfl(unsigned sixty_four in, int idx) {
-    union trove::detail::dismember x;
-    x.m_ulong = in;
-    x.m_ints.a = __shfl(x.m_ints.a, idx);
-    x.m_ints.b = __shfl(x.m_ints.b, idx);
-    return x.m_ulong;
-}
