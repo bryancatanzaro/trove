@@ -87,25 +87,50 @@ struct c2r_offset_constants<8> {
     static const int permute = c2r_power_of_two_constants<8>::permute;
 };
 
-template<typename T, int size, int position=0>
+template<int s>
+struct r2c_offset_constants{};
+
+template<>
+struct r2c_offset_constants<3> {
+    static const int permute = c2r_offset_constants<3>::rotate;
+};
+
+template<>
+struct r2c_offset_constants<5> {
+    static const int permute = c2r_offset_constants<5>::rotate;
+};
+
+template<>
+struct r2c_offset_constants<7> {
+    static const int permute = c2r_offset_constants<7>::rotate;
+};
+
+template<>
+struct r2c_offset_constants<9> {
+    static const int permute = c2r_offset_constants<9>::rotate;
+};
+
+template<typename T, typename constants, int size, int position=0>
 struct tx_permute_impl{};
 
-template<typename HT, typename TT, int size, int position>
-struct tx_permute_impl<thrust::detail::cons<HT, TT>, size, position> {
+template<typename HT, typename TT, typename constants, int size, int position>
+struct tx_permute_impl<
+    thrust::detail::cons<HT, TT>, constants, size, position> {
     typedef typename homogeneous_tuple<size, HT>::type Source;
     typedef thrust::detail::cons<HT, TT> Remaining;
-    static const int permute = c2r_offset_constants<size>::permute;
+    static const int permute = constants::permute;
     static const int new_position = (position + permute) % size;
     __host__ __device__
     static Remaining impl(const Source& src) {
-        return Remaining(thrust::get<position>(src),
-                         tx_permute_impl<TT, size, new_position>::impl(
-                             src));
+        return Remaining(
+            thrust::get<position>(src),
+            tx_permute_impl<TT, constants, size, new_position>::impl(
+                src));
     }
 };
 
-template<int size, int position>
-struct tx_permute_impl<thrust::null_type, size, position> {
+template<typename constants, int size, int position>
+struct tx_permute_impl<thrust::null_type, constants, size, position> {
     template<typename Source>
     __host__ __device__
     static thrust::null_type impl(const Source&) {
@@ -115,9 +140,10 @@ struct tx_permute_impl<thrust::null_type, size, position> {
 
 
 template<typename Tuple>
-__host__ __device__ Tuple tx_permute(const Tuple& t) {
+__host__ __device__ Tuple c2r_tx_permute(const Tuple& t) {
     return tx_permute_impl<
         typename cons_type<Tuple>::type,
+        c2r_offset_constants<thrust::tuple_size<Tuple>::value>,
         thrust::tuple_size<Tuple>::value>::impl(t);
 }
 
@@ -238,7 +264,7 @@ struct c2r_warp_transpose_impl {
                                 const IntTuple& indices,
                                 const int& rotation) {
         detail::warp_shuffle<Tuple, IntTuple>::impl(src, indices);
-        src = rotate(detail::tx_permute(src), rotation);
+        src = rotate(detail::c2r_tx_permute(src), rotation);
     }
 };
 
