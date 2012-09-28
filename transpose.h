@@ -147,7 +147,13 @@ __host__ __device__ Tuple c2r_tx_permute(const Tuple& t) {
         thrust::tuple_size<Tuple>::value>::impl(t);
 }
 
-
+template<typename Tuple>
+__host__ __device__ Tuple r2c_tx_permute(const Tuple& t) {
+    return tx_permute_impl<
+        typename cons_type<Tuple>::type,
+        r2c_offset_constants<thrust::tuple_size<Tuple>::value>,
+        thrust::tuple_size<Tuple>::value>::impl(t);
+}
 
 
 template<typename IntTuple, int b, int o>
@@ -176,7 +182,7 @@ struct compute_offsets_impl<thrust::null_type, b, o> {
 };
 
 template<int m, bool power_of_two>
-struct compute_initial_offset {
+struct c2r_compute_initial_offset {
     typedef c2r_offset_constants<m> constants;
     __device__ static int impl() {
         int warp_id = threadIdx.x & WARP_MASK;
@@ -187,7 +193,7 @@ struct compute_initial_offset {
 };
 
 template<int m>
-struct compute_initial_offset<m, true> {
+struct c2r_compute_initial_offset<m, true> {
     __device__ static int impl() {
         int warp_id = threadIdx.x & WARP_MASK;
         int initial_offset = ((warp_id * (WARP_SIZE + 1)) >>
@@ -198,12 +204,14 @@ struct compute_initial_offset<m, true> {
 };
 
 
+
+
 template<int m, bool power_of_two>
 __device__
 typename homogeneous_tuple<m, int>::type c2r_compute_offsets() {
     typedef c2r_offset_constants<m> constants;
     typedef typename homogeneous_tuple<m, int>::type result_type;
-    int initial_offset = compute_initial_offset<m, power_of_two>::impl();
+    int initial_offset = c2r_compute_initial_offset<m, power_of_two>::impl();
     return compute_offsets_impl<result_type,
                                 WARP_SIZE,
                                 constants::offset>::impl(initial_offset);
