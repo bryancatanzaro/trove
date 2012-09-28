@@ -11,7 +11,7 @@ namespace trove {
 namespace detail {
 
 template<int s>
-struct offset_constants{};
+struct c2r_offset_constants{};
 
 // This Python code computes the necessary magic constants for
 // arbitrary odd sizes
@@ -36,55 +36,55 @@ struct offset_constants{};
 //            return val / n
 
 template<>
-struct offset_constants<3> {
+struct c2r_offset_constants<3> {
     static const int offset=21;
     static const int permute=2;
     static const int rotate=2;
 };
 
 template<>
-struct offset_constants<5> {
+struct c2r_offset_constants<5> {
     static const int offset=19;
     static const int permute=2;
     static const int rotate=3;
 };
 
 template<>
-struct offset_constants<7> {
+struct c2r_offset_constants<7> {
     static const int offset=9;
     static const int permute=4;
     static const int rotate=2;
 };
 
 template<>
-struct offset_constants<9> {
+struct c2r_offset_constants<9> {
     static const int offset=7;
     static const int permute=5;
     static const int rotate=2;
 };
 
 template<int m>
-struct power_of_two_constants {
+struct c2r_power_of_two_constants {
     static const int offset = WARP_SIZE - WARP_SIZE/m; 
     static const int permute = m - 1;
 };
 
 template<>
-struct offset_constants<2> {
-    static const int offset = power_of_two_constants<2>::offset;
-    static const int permute = power_of_two_constants<2>::permute;
+struct c2r_offset_constants<2> {
+    static const int offset = c2r_power_of_two_constants<2>::offset;
+    static const int permute = c2r_power_of_two_constants<2>::permute;
 };
 
 template<>
-struct offset_constants<4> {
-    static const int offset = power_of_two_constants<4>::offset;
-    static const int permute = power_of_two_constants<4>::permute;
+struct c2r_offset_constants<4> {
+    static const int offset = c2r_power_of_two_constants<4>::offset;
+    static const int permute = c2r_power_of_two_constants<4>::permute;
 };
 
 template<>
-struct offset_constants<8> {
-    static const int offset = power_of_two_constants<8>::offset;
-    static const int permute = power_of_two_constants<8>::permute;
+struct c2r_offset_constants<8> {
+    static const int offset = c2r_power_of_two_constants<8>::offset;
+    static const int permute = c2r_power_of_two_constants<8>::permute;
 };
 
 template<typename T, int size, int position=0>
@@ -94,7 +94,7 @@ template<typename HT, typename TT, int size, int position>
 struct tx_permute_impl<thrust::detail::cons<HT, TT>, size, position> {
     typedef typename homogeneous_tuple<size, HT>::type Source;
     typedef thrust::detail::cons<HT, TT> Remaining;
-    static const int permute = offset_constants<size>::permute;
+    static const int permute = c2r_offset_constants<size>::permute;
     static const int new_position = (position + permute) % size;
     __host__ __device__
     static Remaining impl(const Source& src) {
@@ -151,7 +151,7 @@ struct compute_offsets_impl<thrust::null_type, b, o> {
 
 template<int m, bool power_of_two>
 struct compute_initial_offset {
-    typedef offset_constants<m> constants;
+    typedef c2r_offset_constants<m> constants;
     __device__ static int impl() {
         int warp_id = threadIdx.x & WARP_MASK;
         int initial_offset = ((WARP_SIZE - warp_id) * constants::offset)
@@ -175,7 +175,7 @@ struct compute_initial_offset<m, true> {
 template<int m, bool power_of_two>
 __device__
 typename homogeneous_tuple<m, int>::type compute_offsets() {
-    typedef offset_constants<m> constants;
+    typedef c2r_offset_constants<m> constants;
     typedef typename homogeneous_tuple<m, int>::type result_type;
     int initial_offset = compute_initial_offset<m, power_of_two>::impl();
     return compute_offsets_impl<result_type,
@@ -214,7 +214,7 @@ struct compute_indices_impl {
         int warp_id = threadIdx.x & WARP_MASK;
         int size = thrust::tuple_size<IntTuple>::value;
         int r =
-            detail::offset_constants
+            detail::c2r_offset_constants
             <thrust::tuple_size<IntTuple>::value>::rotate;
         rotation = (warp_id * r) % size;
     }
