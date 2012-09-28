@@ -14,13 +14,13 @@ __global__ void test_transpose_indices(Value* r) {
     int global_index = threadIdx.x;
     Value warp_offsets;
     int rotation;
-    compute_indices(warp_offsets, rotation);
+    c2r_compute_indices(warp_offsets, rotation);
     //r[global_index] = warp_offsets;
     Value data;
     data = counting_tuple<Value>::impl(
         global_index * thrust::tuple_size<Value>::value);
     
-    warp_transpose(data, warp_offsets, rotation);
+    c2r_warp_transpose(data, warp_offsets, rotation);
     r[global_index] = data;
 }
 
@@ -32,14 +32,14 @@ __global__ void test_transpose(T* r) {
 
     Indices warp_offsets;
     int rotation;
-    compute_indices(warp_offsets, rotation);
+    c2r_compute_indices(warp_offsets, rotation);
 
     Value data;
     data = counting_tuple<Value>::impl(
         global_index * size);
     
     for(int i = 0; i < 1; i++) {
-        warp_transpose(data, warp_offsets, rotation);
+        c2r_warp_transpose(data, warp_offsets, rotation);
     }
     int warp_begin = threadIdx.x & (~WARP_MASK);
     int warp_idx = threadIdx.x & WARP_MASK;

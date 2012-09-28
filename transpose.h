@@ -174,7 +174,7 @@ struct compute_initial_offset<m, true> {
 
 template<int m, bool power_of_two>
 __device__
-typename homogeneous_tuple<m, int>::type compute_offsets() {
+typename homogeneous_tuple<m, int>::type c2r_compute_offsets() {
     typedef c2r_offset_constants<m> constants;
     typedef typename homogeneous_tuple<m, int>::type result_type;
     int initial_offset = compute_initial_offset<m, power_of_two>::impl();
@@ -194,7 +194,7 @@ struct warp_shuffle<
                                 const thrust::detail::cons<IHT, ITT>& i) {
         d.get_head() = __shfl(d.get_head(), i.get_head());
         warp_shuffle<DTT, ITT>::impl(d.get_tail(),
-                                              i.get_tail());
+                                     i.get_tail());
     }
 };
 
@@ -206,34 +206,34 @@ struct warp_shuffle<
 
 
 template<typename IntTuple, bool is_power_of_two>
-struct compute_indices_impl {
+struct c2r_compute_indices_impl {
     __device__ static void impl(IntTuple& indices, int& rotation) {
         indices =
-            detail::compute_offsets<thrust::tuple_size<IntTuple>::value,
-                                    false>();
-        int warp_id = threadIdx.x & WARP_MASK;
-        int size = thrust::tuple_size<IntTuple>::value;
-        int r =
-            detail::c2r_offset_constants
-            <thrust::tuple_size<IntTuple>::value>::rotate;
-        rotation = (warp_id * r) % size;
-    }
+            detail::c2r_compute_offsets<thrust::tuple_size<IntTuple>::value,
+                                        false>();
+    int warp_id = threadIdx.x & WARP_MASK;
+    int size = thrust::tuple_size<IntTuple>::value;
+    int r =
+        detail::c2r_offset_constants
+        <thrust::tuple_size<IntTuple>::value>::rotate;
+    rotation = (warp_id * r) % size;
+}
 };
 
 template<typename IntTuple>
-struct compute_indices_impl<IntTuple, true> {
+struct c2r_compute_indices_impl<IntTuple, true> {
     __device__ static void impl(IntTuple& indices, int& rotation) {
         indices =
-            detail::compute_offsets<thrust::tuple_size<IntTuple>::value,
-                                    true>();
-        int warp_id = threadIdx.x & WARP_MASK;
-        int size = thrust::tuple_size<IntTuple>::value;
-        rotation = (size - warp_id) & (size - 1);
-    }
+            detail::c2r_compute_offsets<thrust::tuple_size<IntTuple>::value,
+                                        true>();
+    int warp_id = threadIdx.x & WARP_MASK;
+    int size = thrust::tuple_size<IntTuple>::value;
+    rotation = (size - warp_id) & (size - 1);
+}
 };
 
 template<typename Tuple, typename IntTuple, bool is_power_of_two>
-struct warp_transpose_impl {
+struct c2r_warp_transpose_impl {
     __device__ static void impl(Tuple& src,
                                 const IntTuple& indices,
                                 const int& rotation) {
@@ -243,7 +243,7 @@ struct warp_transpose_impl {
 };
 
 template<typename Tuple, typename IntTuple>
-struct warp_transpose_impl<Tuple, IntTuple, true> {
+struct c2r_warp_transpose_impl<Tuple, IntTuple, true> {
     __device__ static void impl(Tuple& src,
                                 const IntTuple& indices,
                                 const int& rotation) {
@@ -252,7 +252,7 @@ struct warp_transpose_impl<Tuple, IntTuple, true> {
             (LOG_WARP_SIZE -
              static_log<thrust::tuple_size<Tuple>::value>::value);
         src = rotate(src, pre_rotation);        
-        warp_transpose_impl<Tuple, IntTuple, false>::impl
+        c2r_warp_transpose_impl<Tuple, IntTuple, false>::impl
             (src, indices, rotation);
     }
 };
@@ -260,23 +260,23 @@ struct warp_transpose_impl<Tuple, IntTuple, true> {
 } //end namespace detail
 
 template<typename IntTuple>
-__device__ void compute_indices(IntTuple& indices, int& rotation) {
-    detail::compute_indices_impl<
+__device__ void c2r_compute_indices(IntTuple& indices, int& rotation) {
+    detail::c2r_compute_indices_impl<
         IntTuple,
         is_power_of_two<thrust::tuple_size<IntTuple>::value>::value>
         ::impl(indices, rotation);
 }
 
 template<typename Tuple>
-__device__ void warp_transpose(Tuple& src,
-                               const typename homogeneous_tuple<
-                                   thrust::tuple_size<Tuple>::value,
-                                   int>::type& indices,
-                               int rotation) {    
+__device__ void c2r_warp_transpose(Tuple& src,
+                                   const typename homogeneous_tuple<
+                                       thrust::tuple_size<Tuple>::value,
+                                       int>::type& indices,
+                                   int rotation) {    
     typedef typename
         homogeneous_tuple<thrust::tuple_size<Tuple>::value, int>::type
         IntTuple;
-    detail::warp_transpose_impl<
+    detail::c2r_warp_transpose_impl<
         Tuple, IntTuple,
         is_power_of_two<thrust::tuple_size<Tuple>::value>::value>::
         impl(src, indices, rotation);
