@@ -270,7 +270,7 @@ struct r2c_compute_offsets_impl{};
 template<typename HT, typename TT, int index, int m>
 struct r2c_compute_offsets_impl<thrust::detail::cons<HT, TT>, index, m> {
     typedef thrust::detail::cons<HT, TT> Tuple;
-    static const int offset = (r2c_offset_constants<m>::permute * index) % m;
+    static const int offset = (WARP_SIZE % m * index) % m;
     __device__
     static Tuple impl(int initial_offset) {
         int current_offset = (initial_offset + offset) & WARP_MASK;
@@ -408,7 +408,7 @@ struct r2c_warp_transpose_impl<Tuple, IntTuple, odd> {
                                 const int& rotation) {
         Tuple rotated = rotate(src, rotation);
         detail::warp_shuffle<Tuple, IntTuple>::impl(rotated, indices);
-        src = detail::r2c_tx_permute(src);
+        src = detail::r2c_tx_permute(rotated);
     }
 };
 
