@@ -1,5 +1,6 @@
 #pragma once
 #include <thrust/tuple.h>
+#include <thrust/detail/type_traits.h>
 
 namespace trove {
 
@@ -63,24 +64,23 @@ struct static_log<0> {
     //Don't take the log of 0!!
 };
 
-template<int m>
-struct static_bit_sum {
-    static const int value = (m & 1) + static_bit_sum<m >> 1>::value;
+
+template<int m, int p=0>
+struct greatest_factor_of_two {
+    static const int value = (m & 0x1) == 0 ? greatest_factor_of_two<m >> 1, p+1>::value : p;
 };
 
-template<>
-struct static_bit_sum<0> {
-    static const int value = 0;
+template<int p>
+struct greatest_factor_of_two<0, p> {
+    static const int value = p;
 };
 
 template<int m>
 struct is_power_of_two {
-    static const bool value = static_bit_sum<m>::value == 1;
+    static const bool value = (m & (m-1)) == 0;
 };
 
-template<>
-struct is_power_of_two<0> {
-    static const bool value = false;
-};
+
+
 
 }
