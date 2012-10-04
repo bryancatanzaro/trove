@@ -113,20 +113,20 @@ void verify(thrust::device_vector<T>& d_r) {
     }
 }
 
-template<int i, typename Tail=thrust::null_type>
-struct int_cons {
-    static const int head = i;
+template<typename T, T i, typename Tail=thrust::null_type>
+struct cons {
+    static const T head = i;
     typedef Tail tail;
 };
 
 typedef
-int_cons<2,
-    int_cons<3,
-    int_cons<4,
-    int_cons<5,
-    int_cons<7,
-    int_cons<8,
-    int_cons<9,
+cons<int, 2,
+    cons<int, 3,
+    cons<int, 4,
+    cons<int, 5,
+    cons<int, 7,
+    cons<int, 8,
+    cons<int, 9,
     thrust::null_type> > > > > > > c2r_arities;
 
 template<int i>
