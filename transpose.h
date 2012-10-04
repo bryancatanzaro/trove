@@ -393,7 +393,7 @@ struct r2c_compute_indices_impl<IntTuple, odd> {
     int size = thrust::tuple_size<IntTuple>::value;
     int r =
         size - detail::r2c_offset_constants
-        <thrust::tuple_size<IntTuple>::value>::rotate;
+        <thrust::tuple_size<IntTuple>::value>::permute;
     rotation = (warp_id * r) % size;
     }
 };
@@ -408,7 +408,7 @@ struct r2c_warp_transpose_impl<Tuple, IntTuple, odd> {
                                 const int& rotation) {
         Tuple rotated = rotate(src, rotation);
         detail::warp_shuffle<Tuple, IntTuple>::impl(rotated, indices);
-        return detail::r2c_tx_permute(src);
+        src = detail::r2c_tx_permute(src);
     }
 };
 
