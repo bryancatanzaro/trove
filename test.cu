@@ -173,14 +173,19 @@ cons<int, 2,
                                                        > > > > > > > > > > > c2r_arities;
 
 typedef
-cons<int, 3,
-     cons<int, 5,
-          cons<int, 7,
-               cons<int, 9,
-                    cons<int, 11,
-                         cons<int, 13,
-                              cons<int, 15,
-                                   thrust::null_type> > > > > > > r2c_arities;
+cons<int, 2,
+     cons<int, 3,
+          cons<int, 4,
+               cons<int, 5,
+                    cons<int, 7,
+                         cons<int, 8,
+                              cons<int, 9,
+                                   cons<int, 11,
+                                        cons<int, 13,
+                                             cons<int, 15,
+                                                  cons<int, 16,
+                                                       thrust::null_type
+                                                       > > > > > > > > > > > r2c_arities;
 
 template<typename T, int i>
 void print_warp_result(const thrust::device_vector<T> e) {

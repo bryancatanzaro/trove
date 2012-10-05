@@ -65,6 +65,11 @@ struct r2c_offset_constants<m, odd> {
     static const int permute = static_mod_inverse<WARP_SIZE, m>::value;
 };
 
+template<int m>
+struct r2c_offset_constants<m, power_of_two> :
+    c2r_offset_constants<m, power_of_two> {
+};
+
 template<typename T, typename constants, int size, int position=0>
 struct tx_permute_impl{};
 
@@ -190,24 +195,41 @@ struct r2c_offsets {
     static const int value = (offset * index) % bound;
 };
 
-template<typename IntTuple, int index, int m>
+template<typename IntTuple, int index, int m, typename Schema>
 struct r2c_compute_offsets_impl{};
 
-template<typename HT, typename TT, int index, int m>
-struct r2c_compute_offsets_impl<thrust::detail::cons<HT, TT>, index, m> {
+template<typename HT, typename TT, int index, int m, typename Schema>
+struct r2c_compute_offsets_impl<thrust::detail::cons<HT, TT>, index, m, Schema> {
     typedef thrust::detail::cons<HT, TT> Tuple;
     static const int offset = (WARP_SIZE % m * index) % m;
     __device__
     static Tuple impl(int initial_offset) {
         int current_offset = (initial_offset + offset) & WARP_MASK;
         return Tuple(current_offset,
-                     r2c_compute_offsets_impl<TT, index + 1, m>::
+                     r2c_compute_offsets_impl<TT, index + 1, m, Schema>::
                      impl(initial_offset));
     }
 };
 
-template<int index, int m>
-struct r2c_compute_offsets_impl<thrust::null_type, index, m> {
+template<typename HT, typename TT, int index, int m>
+struct r2c_compute_offsets_impl<thrust::detail::cons<HT, TT>, index, m, power_of_two> {
+  typedef thrust::detail::cons<HT, TT> Tuple;
+  __device__
+  static Tuple impl(int initial_offset) {
+    int warp_id = threadIdx.x & WARP_MASK;
+    
+    const int logL = static_log<m>::value;
+    const int logP = LOG_WARP_SIZE;
+    int msb_bits = warp_id >> (logP - logL);
+    int lsb_bits = warp_id & ((1 << (logP - logL)) - 1);
+
+    return Tuple((lsb_bits << logL) | ((msb_bits + m - index) % m),
+                 r2c_compute_offsets_impl<TT, index + 1, m, power_of_two>::impl(initial_offset));
+  }
+};
+
+template<int index, int m, typename Schema>
+struct r2c_compute_offsets_impl<thrust::null_type, index, m, Schema> {
     __device__
     static thrust::null_type impl(int) {
         return thrust::null_type();
@@ -222,7 +244,7 @@ typename homogeneous_tuple<m, int>::type r2c_compute_offsets() {
     typedef typename homogeneous_tuple<m, int>::type result_type;
     int initial_offset = r2c_compute_initial_offset<m, Schema>::impl();
     return r2c_compute_offsets_impl<result_type,
-                                    0, m>::impl(initial_offset);
+                                    0, m, Schema>::impl(initial_offset);
 }
         
     
@@ -324,6 +346,18 @@ struct r2c_compute_indices_impl<IntTuple, odd> {
     }
 };
 
+template<typename IntTuple>
+struct r2c_compute_indices_impl<IntTuple, power_of_two> {
+  __device__ static void impl(IntTuple& indices, int& rotation) {
+    int warp_id = threadIdx.x & WARP_MASK;
+    int size = thrust::tuple_size<IntTuple>::value;
+    rotation = warp_id % size;
+    indices = r2c_compute_offsets_impl<IntTuple, 0,
+                                       thrust::tuple_size<IntTuple>::value,
+                                       power_of_two>::impl(0);
+  }
+};
+
 template<typename Tuple, typename IntTuple, typename Schema>
 struct r2c_warp_transpose_impl {};
 
@@ -336,6 +370,19 @@ struct r2c_warp_transpose_impl<Tuple, IntTuple, odd> {
         detail::warp_shuffle<Tuple, IntTuple>::impl(rotated, indices);
         src = detail::r2c_tx_permute(rotated);
     }
+};
+
+template<typename Tuple, typename IntTuple>
+struct r2c_warp_transpose_impl<Tuple, IntTuple, power_of_two> {
+  __device__ static void impl(Tuple& src,
+                              const IntTuple& indices,
+                              const int& rotation) {
+    Tuple rotated = rotate(src, rotation);
+    detail::warp_shuffle<Tuple, IntTuple>::impl(rotated, indices);
+    const int size = thrust::tuple_size<IntTuple>::value;
+    int warp_id = threadIdx.x & WARP_MASK;
+    src = rotate(detail::r2c_tx_permute(rotated), (size-warp_id/(WARP_SIZE/size))%size);
+  }
 };
 
 } //end namespace detail
