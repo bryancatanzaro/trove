@@ -2,6 +2,7 @@
 #include "utility.h"
 #include "rotate.h"
 #include "shfl.h"
+#include "static_mod_inverse.h"
 
 #define WARP_SIZE 32
 #define WARP_MASK 0x1f
@@ -39,104 +40,29 @@ struct tx_algorithm<m, 2, false> {
     typedef multiple_of_four type;
 };
 
-template<int s>
+
+template<int m, typename Schema=typename tx_algorithm<m>::type>
 struct c2r_offset_constants{};
 
-// This Python code computes the necessary magic constants for
-// arbitrary odd sizes
-// m: Number of elements per thread
-// n: Number of threads per warp
-//
-
-//def offset(m, n):
-//    for i in range(m):
-//        val = n * i
-//        if val % m == 1:
-//            return val / m
-//
-//def permute(m, n):
-//    o = offset(m, n)
-//    return (n-1)/o+1
-//
-//def rotate(m, n):
-//    for i in range(m):
-//        val = n * i
-//        if val % m == 1:
-//            return val / n
-
-template<>
-struct c2r_offset_constants<3> {
-    static const int offset=21;
-    static const int permute=2;
-    static const int rotate=2;
-};
-
-template<>
-struct c2r_offset_constants<5> {
-    static const int offset=19;
-    static const int permute=2;
-    static const int rotate=3;
-};
-
-template<>
-struct c2r_offset_constants<7> {
-    static const int offset=9;
-    static const int permute=4;
-    static const int rotate=2;
-};
-
-template<>
-struct c2r_offset_constants<9> {
-    static const int offset=7;
-    static const int permute=5;
-    static const int rotate=2;
+template<int m>
+struct c2r_offset_constants<m, odd> {
+    static const int offset = WARP_SIZE - static_mod_inverse<m, WARP_SIZE>::value;
+    static const int rotate = static_mod_inverse<WARP_SIZE, m>::value;
+    static const int permute = static_mod_inverse<rotate, m>::value;
 };
 
 template<int m>
-struct c2r_power_of_two_constants {
+struct c2r_offset_constants<m, power_of_two> {
     static const int offset = WARP_SIZE - WARP_SIZE/m; 
     static const int permute = m - 1;
 };
 
-template<>
-struct c2r_offset_constants<2> {
-    static const int offset = c2r_power_of_two_constants<2>::offset;
-    static const int permute = c2r_power_of_two_constants<2>::permute;
-};
-
-template<>
-struct c2r_offset_constants<4> {
-    static const int offset = c2r_power_of_two_constants<4>::offset;
-    static const int permute = c2r_power_of_two_constants<4>::permute;
-};
-
-template<>
-struct c2r_offset_constants<8> {
-    static const int offset = c2r_power_of_two_constants<8>::offset;
-    static const int permute = c2r_power_of_two_constants<8>::permute;
-};
-
-template<int s>
+template<int m, typename Schema=typename tx_algorithm<m>::type>
 struct r2c_offset_constants{};
 
-template<>
-struct r2c_offset_constants<3> {
-    static const int permute = c2r_offset_constants<3>::rotate;
-};
-
-template<>
-struct r2c_offset_constants<5> {
-    static const int permute = c2r_offset_constants<5>::rotate;
-};
-
-template<>
-struct r2c_offset_constants<7> {
-    static const int permute = c2r_offset_constants<7>::rotate;
-};
-
-template<>
-struct r2c_offset_constants<9> {
-    static const int permute = c2r_offset_constants<9>::rotate;
+template<int m>
+struct r2c_offset_constants<m, odd> {
+    static const int permute = static_mod_inverse<WARP_SIZE, m>::value;
 };
 
 template<typename T, typename constants, int size, int position=0>

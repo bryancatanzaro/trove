@@ -165,16 +165,37 @@ cons<int, 2,
                     cons<int, 7,
                          cons<int, 8,
                               cons<int, 9,
-                                   thrust::null_type> > > > > > > c2r_arities;
+                                   cons<int, 11,
+                                        cons<int, 13,
+                                             cons<int, 15,
+                                                  cons<int, 16,
+                                                       thrust::null_type
+                                                       > > > > > > > > > > > c2r_arities;
 
 typedef
 cons<int, 3,
      cons<int, 5,
           cons<int, 7,
                cons<int, 9,
-                    thrust::null_type> > > > r2c_arities;
+                    cons<int, 11,
+                         cons<int, 13,
+                              cons<int, 15,
+                                   thrust::null_type> > > > > > > r2c_arities;
 
-// typedef cons<int, 5, thrust::null_type> r2c_arities;
+template<typename T, int i>
+void print_warp_result(const thrust::device_vector<T> e) {
+    thrust::host_vector<int> f = e;
+    for(int row = 0; row < i; row++) {
+        for(int col = 0; col < 32; col++) {
+            int r = f[col + row * 32];
+            if (r < 10) std::cout << " ";
+            if (r < 100) std::cout << " ";
+            std::cout << f[col + row * 32] << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
 
 template<int i>
 struct test_c2r {
