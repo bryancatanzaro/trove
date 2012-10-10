@@ -1,4 +1,5 @@
 import numpy as np
+import fractions
 
 class Array(object):
     def __init__(self, *shape):
@@ -50,6 +51,14 @@ def offset_p2_constant_2(m, n):
 
 def permute_p2_constant(m, n):
     return n % m
+
+def mod_mult_inverse(a, b):
+    if fractions.gcd(a, b) != 1:
+        raise ValueError("Modular Multiplicative Inverse does not exist")
+    for m in range(b):
+        if (a * m) % b == 1:
+            return m
+
         
 def make_row_array(m, n):
     result = Array(m, n)
@@ -185,6 +194,26 @@ def r2c_odd_rotates(a):
     #         return candidate_rotation
     #assert(False)
 
+def composite_c2r_prerotate(a):
+    m, n = a.shape()
+    c = fractions.gcd(m, n)
+    return map(lambda xi: xi/(n/c), range(n))
+
+def c2r_golden_shuffles(a):
+    m, n = a.shape()
+    result = Array(m, n)
+    #Sentinels in result
+    for row in range(m):
+        for col in range(n):
+            result[row, col] = -1
+    for row in range(m):
+        for col in range(n):
+            dest_col = a[row, col] % n
+            if result[row, dest_col] > -1:
+                raise ValueError("Array is unshufflable (%s, %s)" % (row, col))
+            result[row, dest_col] = col
+    return result
+
 def r2c_golden_shuffles(a):
     m, n = a.shape()
     result = Array(m, n)
@@ -213,14 +242,56 @@ def r2c_transpose(a):
     shuffled = row_shuffle(rotated, r2c_odd_shuffles(a))
     permuted = col_permute(shuffled, r2c_odd_permute(a))
     return permuted
-   
-a = make_col_array(14, 32)
+
+def dest_c2r_col(a):
+    m, n = a.shape()
+    result = Array(m, n)
+    for row in range(m):
+        for col in range(n):
+            result[row, col] = a[row, col] % n
+    return result
+
+def composite_c2r_shuffles(a):
+    m, n = a.shape()
+    c = fractions.gcd(m, n)
+    k = mod_mult_inverse(m/c, n/c)
+    result = Array(m, n)
+    for col in range(n):
+        for row in range(m):
+            idx = col + row * (n-1)
+            if row > m - c + (col % c):
+                idx += m
+            result[row, col] = \
+                ((idx/c)*k % (n/c) + (idx % c) * (n/c)) % n
+    return result
+
+def composite_c2r_permutes(a):
+    m, n = a.shape()
+    offset = n % m
+    c = fractions.gcd(m, n)
+    period = m / c
+    result = [0] * m
+    idx = 0
+    for col in range(m):
+        result[col] = idx
+        idx += offset
+        if (col % period) == period - 1:
+            idx -= 1
+        idx = idx % m
+    return result
+
+m = 24
+n = 32
+a = make_col_array(m, n)
 print(a)
-b = transpose(a)
+b = col_rotate(a, composite_c2r_prerotate(a))
 print(b)
-
-    
-
+c = row_shuffle(b, composite_c2r_shuffles(a))
+print(c)
+d = col_rotate(c, map(lambda xi: xi % m, range(n)))
+print(d)
+e = col_permute(d, composite_c2r_permutes(a))
+print(e)
 
 # a = make_row_array(5, 32)
 # print(a)
