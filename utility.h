@@ -64,23 +64,15 @@ struct static_log<0> {
     //Don't take the log of 0!!
 };
 
-
-template<int m, int p=0>
-struct greatest_factor_of_two {
-    static const int value = (m & 0x1) == 0 ? greatest_factor_of_two<m >> 1, p+1>::value : p;
-};
-
-template<int p>
-struct greatest_factor_of_two<0, p> {
-    static const int value = p;
-};
-
 template<int m>
 struct is_power_of_two {
     static const bool value = (m & (m-1)) == 0;
 };
 
-
+template<int m>
+struct is_odd {
+    static const bool value = (m & 1) == 1;
+};
 
 
 }

@@ -3,6 +3,7 @@
 #include "rotate.h"
 #include "shfl.h"
 #include "static_mod_inverse.h"
+#include "static_gcd.h"
 
 #define WARP_SIZE 32
 #define WARP_MASK 0x1f
@@ -13,33 +14,22 @@ namespace detail {
 
 struct odd{};
 struct power_of_two{};
-struct multiple_of_four{};
-struct multiple_of_two{};
-struct other; //Leaving this type incomplete is a static assertion,
-              //since we don't have a multiple_of_eight, etc. type.
+struct composite{};
 
-template<int m, int gf2=greatest_factor_of_two<m>::value, bool po2=is_power_of_two<m>::value>
+template<int m, bool ispo2=is_power_of_two<m>::value, bool isodd=is_odd<m>::value>
 struct tx_algorithm {
-    typedef typename thrust::detail::eval_if<po2,
-                                             thrust::detail::identity_<power_of_two>,
-                                             thrust::detail::identity_<other> >::type type;
+    typedef composite type;
 };
 
 template<int m>
-struct tx_algorithm<m, 0, false> {
+struct tx_algorithm<m, true, false> {
+    typedef power_of_two type;
+};
+
+template<int m>
+struct tx_algorithm<m, false, true> {
     typedef odd type;
 };
-
-template<int m>
-struct tx_algorithm<m, 1, false> {
-    typedef multiple_of_two type;
-};
-
-template<int m>
-struct tx_algorithm<m, 2, false> {
-    typedef multiple_of_four type;
-};
-
 
 template<int m, typename Schema=typename tx_algorithm<m>::type>
 struct c2r_offset_constants{};
@@ -57,6 +47,14 @@ struct c2r_offset_constants<m, power_of_two> {
     static const int permute = m - 1;
 };
 
+template<int m>
+struct c2r_offset_constants<m, composite> {
+    static const int c = static_gcd<m, WARP_SIZE>::value;
+    static const int k = static_mod_inverse<m/c, WARP_SIZE/c>::value;
+    static const int permute = WARP_SIZE % m;
+    static const int period = m / c;
+};
+
 template<int m, typename Schema=typename tx_algorithm<m>::type>
 struct r2c_offset_constants{};
 
@@ -70,27 +68,26 @@ struct r2c_offset_constants<m, power_of_two> :
     c2r_offset_constants<m, power_of_two> {
 };
 
-template<typename T, typename constants, int size, int position=0>
+template<typename T, template<int> class Permute, int position=0>
 struct tx_permute_impl{};
 
-template<typename HT, typename TT, typename constants, int size, int position>
+template<typename HT, typename TT, template<int> class Permute, int position>
 struct tx_permute_impl<
-    thrust::detail::cons<HT, TT>, constants, size, position> {
-    typedef typename homogeneous_tuple<size, HT>::type Source;
+    thrust::detail::cons<HT, TT>, Permute, position> {
     typedef thrust::detail::cons<HT, TT> Remaining;
-    static const int permute = constants::permute;
-    static const int new_position = (position + permute) % size;
+    static const int idx = Permute<position>::value;
+    template<typename Source>
     __host__ __device__
     static Remaining impl(const Source& src) {
         return Remaining(
-            thrust::get<position>(src),
-            tx_permute_impl<TT, constants, size, new_position>::impl(
+            thrust::get<idx>(src),
+            tx_permute_impl<TT, Permute, position+1>::impl(
                 src));
     }
 };
 
-template<typename constants, int size, int position>
-struct tx_permute_impl<thrust::null_type, constants, size, position> {
+template<template<int> class Permute, int position>
+struct tx_permute_impl<thrust::null_type, Permute, position> {
     template<typename Source>
     __host__ __device__
     static thrust::null_type impl(const Source&) {
@@ -99,20 +96,52 @@ struct tx_permute_impl<thrust::null_type, constants, size, position> {
 };
 
 
+template<int m, int a, int b=0>
+struct affine_modular_fn {
+    template<int x>
+    struct eval {
+        static const int value = (a * x + b) % m;
+    };
+};
+
+template<int m>
+struct composite_c2r_permute_fn {
+    static const int o = WARP_SIZE % m;
+    static const int c = static_gcd<m, WARP_SIZE>::value;
+    static const int p = m / c;
+    template<int x>
+    struct eval {
+        static const int value = (x * o - (x / p)) % m;
+    };
+};
+
+
+
+
 template<typename Tuple>
 __host__ __device__ Tuple c2r_tx_permute(const Tuple& t) {
     return tx_permute_impl<
         typename cons_type<Tuple>::type,
-        c2r_offset_constants<thrust::tuple_size<Tuple>::value>,
-        thrust::tuple_size<Tuple>::value>::impl(t);
+        affine_modular_fn<thrust::tuple_size<Tuple>::value,
+                          c2r_offset_constants<thrust::tuple_size<Tuple>::value>::permute>::template eval>::impl(t);
 }
+
+
+
+template<typename Tuple>
+__host__ __device__ Tuple composite_c2r_tx_permute(const Tuple& t) {
+    return tx_permute_impl<
+        typename cons_type<Tuple>::type,
+        composite_c2r_permute_fn<thrust::tuple_size<Tuple>::value>::template eval>::impl(t);
+}
+
 
 template<typename Tuple>
 __host__ __device__ Tuple r2c_tx_permute(const Tuple& t) {
     return tx_permute_impl<
         typename cons_type<Tuple>::type,
-        r2c_offset_constants<thrust::tuple_size<Tuple>::value>,
-        thrust::tuple_size<Tuple>::value>::impl(t);
+        affine_modular_fn<thrust::tuple_size<Tuple>::value,
+                          r2c_offset_constants<thrust::tuple_size<Tuple>::value>::permute>::template eval>::impl(t);
 }
 
 

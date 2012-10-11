@@ -265,11 +265,29 @@ def composite_c2r_shuffles(a):
                 ((idx/c)*k % (n/c) + (idx % c) * (n/c)) % n
     return result
 
+def simple_composite_c2r_shuffles(a):
+    m, n = a.shape()
+    c = fractions.gcd(m, n)
+    k = mod_mult_inverse(m/c, n/c)
+    result = Array(m, n)
+    for col in range(n):
+        idx = col
+        for row in range(m):
+            result[row, col] = \
+                ((idx/c)*k % (n/c) + (idx % c) * (n/c)) % n
+            idx += n-1
+            if row == m - c + (col % c):
+                idx += m
+
+    return result
+
 def composite_c2r_permutes(a):
     m, n = a.shape()
     offset = n % m
     c = fractions.gcd(m, n)
     period = m / c
+    # return map(lambda xi: (xi * offset - (xi / period)) % m, range(m))
+    
     result = [0] * m
     idx = 0
     for col in range(m):
@@ -280,18 +298,21 @@ def composite_c2r_permutes(a):
         idx = idx % m
     return result
 
-m = 24
+m = 12
 n = 32
 a = make_col_array(m, n)
-print(a)
-b = col_rotate(a, composite_c2r_prerotate(a))
-print(b)
-c = row_shuffle(b, composite_c2r_shuffles(a))
-print(c)
-d = col_rotate(c, map(lambda xi: xi % m, range(n)))
-print(d)
-e = col_permute(d, composite_c2r_permutes(a))
-print(e)
+print composite_c2r_shuffles(a)
+print simple_composite_c2r_shuffles(a)
+print composite_c2r_permutes(a)
+# print(a)
+# b = col_rotate(a, composite_c2r_prerotate(a))
+# print(b)
+# c = row_shuffle(b, composite_c2r_shuffles(a))
+# print(c)
+# d = col_rotate(c, map(lambda xi: xi % m, range(n)))
+# print(d)
+# e = col_permute(d, composite_c2r_permutes(a))
+# print(e)
 
 # a = make_row_array(5, 32)
 # print(a)
