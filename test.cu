@@ -158,20 +158,19 @@ struct cons_c {
     typedef Tail tail;
 };
 
-typedef
-cons_c<int, 2,
-     cons_c<int, 3,
-          cons_c<int, 4,
-               cons_c<int, 5,
-                    cons_c<int, 7,
-                         cons_c<int, 8,
-                              cons_c<int, 9,
-                                   cons_c<int, 11,
-                                        cons_c<int, 13,
-                                             cons_c<int, 15,
-                                                  cons_c<int, 16,
-                                                       null_type
-                                                       > > > > > > > > > > > c2r_arities;
+template<int k, int l>
+struct static_range {
+    static const int head = k;
+    typedef static_range<k+1, l> tail;
+};
+
+template<int f>
+struct static_range<f, f> {
+    static const int head = f;
+    typedef null_type tail;
+};
+
+typedef static_range<2, 16> c2r_arities;
 
 typedef
 cons_c<int, 2,
