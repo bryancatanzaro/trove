@@ -12,6 +12,8 @@ struct array {
     tail_type tail;
     __host__ __device__
     array(head_type h, const tail_type& t) : head(h), tail(t) {}
+    __host__ __device__
+    array() : head(), tail() {}
 };
 
 template<typename T>

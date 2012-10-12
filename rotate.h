@@ -49,7 +49,7 @@ struct rotate_impl_helper {
     static const int size = Array::size;
     static const int next_i = i * 2;
     __host__ __device__
-    static Tuple impl(const Array& t, int a) {
+    static Array impl(const Array& t, int a) {
         Array rotated = t;
         rotate_elements<Array, i>::impl(t, a, rotated);
         return rotate_impl<Array, next_i>::impl(rotated, a);

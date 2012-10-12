@@ -1,7 +1,7 @@
 #include <iostream>
 #include "transpose.h"
 #include "memory.h"
-#include "print_tuple.h"
+#include "print_array.h"
 #include <thrust/device_vector.h>
 
 using namespace trove;
@@ -9,7 +9,7 @@ using namespace trove;
 template<int size, typename T>
 __global__ void test_c2r_transpose(T* r) {
     typedef array<T, size> Value;
-    typedef array<T, int> Indices;
+    typedef array<int, size> Indices;
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
 
     Indices warp_offsets;
@@ -33,7 +33,7 @@ __global__ void test_c2r_transpose(T* r) {
 template<int size, typename T>
 __global__ void test_r2c_transpose(T* r) {
     typedef array<T, size> Value;
-    typedef array<T, int> Indices;
+    typedef array<int, size> Indices;
   
     int global_warp_id = (threadIdx.x >> LOG_WARP_SIZE) + (blockDim.x >> LOG_WARP_SIZE) * blockIdx.x;
     int warp_idx = threadIdx.x & WARP_MASK;
