@@ -400,6 +400,20 @@ struct c2r_warp_transpose_impl<Array, Indices, power_of_two> {
     }
 };
 
+template<typename Array, typename Indices>
+struct c2r_warp_transpose_impl<Array, Indices, composite> {
+    __device__ static void impl(Array& src,
+                                const Indices& indices,
+                                const int& rotation) {
+        int warp_id = threadIdx.x & WARP_MASK;
+        int pre_rotation = warp_id >> static_log<WARP_SIZE/static_gcd<Array::size, WARP_SIZE>::value>::value;
+        src = rotate(src, pre_rotation);
+        detail::warp_shuffle<Array, Indices>::impl(src, indices);
+        src = rotate(src, rotation);
+        src = composite_c2r_tx_permute(src);
+    }
+};
+
 template<typename Array, typename Schema>
 struct r2c_compute_indices_impl {};
 
