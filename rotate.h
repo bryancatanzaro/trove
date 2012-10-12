@@ -1,90 +1,89 @@
 #pragma once
-#include <thrust/tuple.h>
 
 namespace trove {
 namespace detail {
 
-template<typename Tuple, int i, int j=0>
+template<typename Array, int i, int j=0>
 struct rotate_elements;
 
-template<typename Tuple, int i, int j, bool non_terminal>
+template<typename Array, int i, int j, bool non_terminal>
 struct rotate_elements_helper {
-    static const int size = thrust::tuple_size<Tuple>::value;
+    static const int size = Array::size;
     static const int other = (i + j) % size;
     static const bool new_non_terminal = j < size-2;
     __host__ __device__
-    static void impl(const Tuple& t, int a, Tuple& r) {
+    static void impl(const Array& t, int a, Array& r) {
         if (a & i)
-            thrust::get<j>(r) = thrust::get<other>(t);
-        rotate_elements_helper<Tuple, i, j+1, new_non_terminal>::impl(t, a, r);
+            trove::get<j>(r) = trove::get<other>(t);
+        rotate_elements_helper<Array, i, j+1, new_non_terminal>::impl(t, a, r);
     }
 };
 
-template<typename Tuple, int i, int j>
-struct rotate_elements_helper<Tuple, i, j, false> {
-    static const int size = thrust::tuple_size<Tuple>::value;
+template<typename Array, int i, int j>
+struct rotate_elements_helper<Array, i, j, false> {
+    static const int size = Array::size;
     static const int other = (i + j) % size;
     __host__ __device__
-    static void impl(const Tuple& t, int a, Tuple& r) {
+    static void impl(const Array& t, int a, Array& r) {
         if (a & i)
-            thrust::get<j>(r) = thrust::get<other>(t);
+            trove::get<j>(r) = trove::get<other>(t);
     }
 };
 
 
-template<typename Tuple, int i, int j>
+template<typename Array, int i, int j>
 struct rotate_elements{
-    static const int size = thrust::tuple_size<Tuple>::value;
+    static const int size = Array::size;
     static const bool non_terminal = j < size-1;
     __host__ __device__
-    static void impl(const Tuple& t, int a, Tuple& r) {
-        rotate_elements_helper<Tuple, i, 0, non_terminal>::impl(t, a, r);
+    static void impl(const Array& t, int a, Array& r) {
+        rotate_elements_helper<Array, i, 0, non_terminal>::impl(t, a, r);
     }
 };
 
-template<typename Tuple, int i>
+template<typename Array, int i>
 struct rotate_impl;
 
-template<typename Tuple, int i, bool non_terminal>
+template<typename Array, int i, bool non_terminal>
 struct rotate_impl_helper {
-    static const int size = thrust::tuple_size<Tuple>::value;
+    static const int size = Array::size;
     static const int next_i = i * 2;
     __host__ __device__
-    static Tuple impl(const Tuple& t, int a) {
-        Tuple rotated = t;
-        rotate_elements<Tuple, i>::impl(t, a, rotated);
-        return rotate_impl<Tuple, next_i>::impl(rotated, a);
+    static Tuple impl(const Array& t, int a) {
+        Array rotated = t;
+        rotate_elements<Array, i>::impl(t, a, rotated);
+        return rotate_impl<Array, next_i>::impl(rotated, a);
     }
 };
 
-template<typename Tuple, int i>
-struct rotate_impl_helper<Tuple, i, false> {
-    static const int size = thrust::tuple_size<Tuple>::value;
+template<typename Array, int i>
+struct rotate_impl_helper<Array, i, false> {
+    static const int size = Array::size;
     __host__ __device__
-    static Tuple impl(const Tuple& t, int a) {
-        Tuple rotated = t;
-        rotate_elements<Tuple, i>::impl(t, a, rotated);
+    static Array impl(const Array& t, int a) {
+        Array rotated = t;
+        rotate_elements<Array, i>::impl(t, a, rotated);
         return rotated;
     }
 };
     
-template<typename Tuple, int i>
+template<typename Array, int i>
 struct rotate_impl {
-    static const int size = thrust::tuple_size<Tuple>::value;
+    static const int size = Array::size;
     static const int next_i = i * 2;
     static const bool non_terminal = next_i < size;
     __host__ __device__
-    static Tuple impl(const Tuple& t, int a) {
-        return rotate_impl_helper<Tuple, i, non_terminal>::impl(t, a);
+    static Array impl(const Array& t, int a) {
+        return rotate_impl_helper<Array, i, non_terminal>::impl(t, a);
     }
 };
 
 } //ends namespace detail
 
-template<typename Tuple>
+template<typename Array>
 __host__ __device__
-Tuple rotate(const Tuple& t, int a) {
-    return detail::rotate_impl<Tuple, 1>::impl(t, a);
+Array rotate(const Array& t, int a) {
+    return detail::rotate_impl<Array, 1>::impl(t, a);
 }
 
 } //ends namespace trove

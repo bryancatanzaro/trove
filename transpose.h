@@ -218,21 +218,23 @@ typename homogeneous_tuple<m, int>::type c2r_compute_offsets() {
 }
 
 template<typename T, int m, int p = 0>
-struct c2r_compute_composite_offsets_impl{};
+struct c2r_compute_composite_offsets{};
  
 template<typename HT, typename TT, int m, int p>
-struct c2r_compute_composite_offsets_impl<thrust::detail::cons<HT, TT>, m> {
+struct c2r_compute_composite_offsets<thrust::detail::cons<HT, TT>, m> {
+    static const int n = WARP_SIZE;
+    static const int mod_n = n - 1;
     static const int c = static_gcd<m, WARP_SIZE>::value;
     static const int k = static_mod_inverse<m/c, n/c>::value;
     static const int mod_c = c - 1;
     static const int log_c = static_log<c>::value;
-    static const int n_div_c = WARP_SIZE / c;
+    static const int n_div_c = n / c;
     static const int mod_n_div_c = n_div_c - 1;
     static const int log_n_div_c = static_log<n_div_c>::value;
     typedef thrust::detail::cons<HT, TT> result_type;
     __host__ __device__ static result_type impl(int idx, int col) {
         int offset = ((((idx >> log_c) * k) & mod_n_div_c) +
-                      ((idx & mod_c) << log_n_div_c)) & WARP_MASK;
+                      ((idx & mod_c) << log_n_div_c)) & mod_n;
         int new_idx = idx + n - 1;
         new_idx = (p == m - c + (col & mod_c)) ? new_idx + m : new_idx;
         return result_type(offset,
@@ -243,20 +245,11 @@ struct c2r_compute_composite_offsets_impl<thrust::detail::cons<HT, TT>, m> {
 };
 
 template<int m, int p>
-struct c2r_compute_composite_offsets_impl<thrust::null_type, m> {
+struct c2r_compute_composite_offsets<thrust::null_type, m> {
     __host__ __device__ static thrust::null_type impl(int, int) {
         return thrust::null_type();
     }
 };
-
-template<int m>
-__device__
-typename homogeneous_tuple<m, int>::type c2r_compute_composite_offsets() {
-    typedef typename homogeneous_tuple<m, int>::type result_type;
-    int warp_id = threadIdx.x & WARP_MASK;
-    return c2r_compute_composite_offsets_impl<result_type>::
-        impl(warp_id, warp_id);
-}
 
  
 template<int index, int offset, int bound>
@@ -372,10 +365,11 @@ struct c2r_compute_indices_impl<IntTuple, power_of_two> {
 template<typename IntTuple>
 struct c2r_compute_indices_impl<IntTuple, composite> {
     __device__ static void impl(IntTuple& indices, int& rotation) {
+        int warp_id = threadIdx.x & WARP_MASK;
+  
         indices =
             detail::c2r_composite_compute_offsets<
-            thrust::tuple_size<IntTuple>::value>::impl();
-        int warp_id = threadIdx.x & WARP_MASK;
+                thrust::tuple_size<IntTuple>::value>::impl(warp_id, warp_id);
         rotation = warp_id % thrust::tuple_size<IntTuple>::value;
     }
 };

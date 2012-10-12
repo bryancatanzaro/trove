@@ -1,4 +1,3 @@
-#include <thrust/tuple.h>
 #include <iostream>
 #include "transpose.h"
 #include "memory.h"
@@ -9,8 +8,8 @@ using namespace trove;
 
 template<int size, typename T>
 __global__ void test_c2r_transpose(T* r) {
-    typedef typename homogeneous_tuple<size, T>::type Value;
-    typedef typename homogeneous_tuple<size, int>::type Indices;
+    typedef array<T, size> Value;
+    typedef array<T, int> Indices;
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
 
     Indices warp_offsets;
@@ -18,7 +17,7 @@ __global__ void test_c2r_transpose(T* r) {
     c2r_compute_indices(warp_offsets, rotation);
 
     Value data;
-    data = counting_tuple<Value>::impl(
+    data = counting_array<Value>::impl(
         global_index * size);
     
     c2r_warp_transpose(data, warp_offsets, rotation);
@@ -33,8 +32,8 @@ __global__ void test_c2r_transpose(T* r) {
 
 template<int size, typename T>
 __global__ void test_r2c_transpose(T* r) {
-    typedef typename homogeneous_tuple<size, T>::type Value;
-    typedef typename homogeneous_tuple<size, int>::type Indices;
+    typedef array<T, size> Value;
+    typedef array<T, int> Indices;
   
     int global_warp_id = (threadIdx.x >> LOG_WARP_SIZE) + (blockDim.x >> LOG_WARP_SIZE) * blockIdx.x;
     int warp_idx = threadIdx.x & WARP_MASK;
@@ -45,7 +44,7 @@ __global__ void test_r2c_transpose(T* r) {
     r2c_compute_indices(warp_offsets, rotation);
 
     Value data;
-    data = counting_tuple<Value>::impl(
+    data = counting_array<Value>::impl(
         start_value, WARP_SIZE);
     
     r2c_warp_transpose(data, warp_offsets, rotation);
@@ -62,10 +61,10 @@ __global__ void test_r2c_transpose(T* r) {
 template<int size, typename T>
 __global__ void test_uncoalesced_store(T* r) {
     
-    typedef typename homogeneous_tuple<size, T>::type Value;
+    typedef array<T, size> Value;
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
 
-    Value data = counting_tuple<Value>::impl(
+    Value data = counting_array<Value>::impl(
         global_index * size);
     
     T* thread_ptr = r + global_index * size;
@@ -76,14 +75,14 @@ __global__ void test_uncoalesced_store(T* r) {
 
 template<int size, typename T>
 __global__ void test_shared_c2r_transpose(T* r) {
-    typedef typename homogeneous_tuple<size, T>::type Value;
+    typedef array<T, size> Value;
 
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int work_per_thread = thrust::tuple_size<Value>::value;
     extern __shared__ T smem[];
     
     Value data;
-    data = counting_tuple<Value>::impl(
+    data = counting_array<Value>::impl(
         global_index * work_per_thread);
     int warp_id = threadIdx.x >> 5;
     int warp_idx = threadIdx.x & WARP_MASK;
@@ -151,40 +150,42 @@ void verify_r2c(thrust::device_vector<T>& d_r) {
     }
 }
 
-template<typename T, T i, typename Tail=thrust::null_type>
-struct cons {
+struct null_type{};
+
+template<typename T, T i, typename Tail=null_type>
+struct cons_c {
     static const T head = i;
     typedef Tail tail;
 };
 
 typedef
-cons<int, 2,
-     cons<int, 3,
-          cons<int, 4,
-               cons<int, 5,
-                    cons<int, 7,
-                         cons<int, 8,
-                              cons<int, 9,
-                                   cons<int, 11,
-                                        cons<int, 13,
-                                             cons<int, 15,
-                                                  cons<int, 16,
-                                                       thrust::null_type
+cons_c<int, 2,
+     cons_c<int, 3,
+          cons_c<int, 4,
+               cons_c<int, 5,
+                    cons_c<int, 7,
+                         cons_c<int, 8,
+                              cons_c<int, 9,
+                                   cons_c<int, 11,
+                                        cons_c<int, 13,
+                                             cons_c<int, 15,
+                                                  cons_c<int, 16,
+                                                       null_type
                                                        > > > > > > > > > > > c2r_arities;
 
 typedef
-cons<int, 2,
-     cons<int, 3,
-          cons<int, 4,
-               cons<int, 5,
-                    cons<int, 7,
-                         cons<int, 8,
-                              cons<int, 9,
-                                   cons<int, 11,
-                                        cons<int, 13,
-                                             cons<int, 15,
-                                                  cons<int, 16,
-                                                       thrust::null_type
+cons_c<int, 2,
+     cons_c<int, 3,
+          cons_c<int, 4,
+               cons_c<int, 5,
+                    cons_c<int, 7,
+                         cons_c<int, 8,
+                              cons_c<int, 9,
+                                   cons_c<int, 11,
+                                        cons_c<int, 13,
+                                             cons_c<int, 15,
+                                                  cons_c<int, 16,
+                                                       null_type
                                                        > > > > > > > > > > > r2c_arities;
 
 template<typename T, int i>
@@ -241,7 +242,7 @@ struct do_tests {
 };
 
 template<template<int> class F>
-struct do_tests<F, thrust::null_type> {
+struct do_tests<F, null_type> {
     static void impl() {}
 };
   
