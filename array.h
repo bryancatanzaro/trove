@@ -14,6 +14,14 @@ struct array {
     array(head_type h, const tail_type& t) : head(h), tail(t) {}
     __host__ __device__
     array() : head(), tail() {}
+    __host__ __device__
+    array(const array& other) : head(other.head), tail(other.tail) {}
+    __host__ __device__
+    array& operator=(const array& other) {
+        head = other.head;
+        tail = other.tail;
+        return *this;
+    }
 };
 
 template<typename T>
