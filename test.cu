@@ -172,7 +172,7 @@ struct static_range<f, f> {
 
 typedef static_range<2, 16> c2r_arities;
 
-typedef static_range<6, 6> r2c_arities;
+typedef static_range<2, 16> r2c_arities;
 
 template<typename T, int i>
 void print_warp_result(const thrust::device_vector<T> e) {
@@ -208,14 +208,12 @@ struct test_r2c {
     static void impl() {
         std::cout << "Testing r2c transpose for " <<
             i << " elements per thread" << std::endl;
-
         int n_blocks = 15 * 8 * 100;
         int block_size = 256;
         thrust::device_vector<int> e(n_blocks*block_size*i);
         test_r2c_transpose<i>
             <<<n_blocks, block_size>>>(thrust::raw_pointer_cast(e.data()));
         verify_r2c<i>(e);
-
     }
 };
 
@@ -233,7 +231,7 @@ struct do_tests<F, null_type> {
 };
   
 int main() {
-    //do_tests<test_c2r, c2r_arities>::impl();
+    do_tests<test_c2r, c2r_arities>::impl();
     do_tests<test_r2c, r2c_arities>::impl();
  
 }

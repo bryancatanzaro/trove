@@ -530,6 +530,8 @@ struct r2c_warp_transpose_impl<Array, Indices, power_of_two> {
 
 template<typename Array, typename Indices>
 struct r2c_warp_transpose_impl<Array, Indices, composite> {
+    static const int c = static_gcd<Array::size, WARP_SIZE>::value;
+    static const int size = Array::size;
     __device__ static void impl(Array& src,
                                 const Indices& indices,
                                 const int& rotation) {
@@ -537,8 +539,7 @@ struct r2c_warp_transpose_impl<Array, Indices, composite> {
         src = composite_r2c_tx_permute(src);
         src = rotate(src, rotation);
         detail::warp_shuffle<Array, Indices>::impl(src, indices);
-        const int size = Array::size;
-        src = rotate(src, size - (warp_id/(WARP_SIZE/size)));
+        src = rotate(src, size - (warp_id/(WARP_SIZE/c)));
     }
 };
 
