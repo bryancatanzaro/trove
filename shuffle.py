@@ -298,18 +298,18 @@ def composite_c2r_permutes(a):
         idx = idx % m
     return result
 
+def composite_c2r(a):
+    m, n = a.shape()
+    pre_rotated = col_rotate(a, composite_c2r_prerotate(a))
+    shuffled = row_shuffle(pre_rotated, composite_c2r_shuffles(a))
+    post_rotated = col_rotate(shuffled, map(lambda xi: xi % m, range(n)))
+    permuted = col_permute(post_rotated, composite_c2r_permutes(a))
+    return permuted
+
 m = 12
 n = 32
 a = make_col_array(m, n)
-print(a)
-b = col_rotate(a, composite_c2r_prerotate(a))
-print(b)
-c = row_shuffle(b, composite_c2r_shuffles(a))
-print(c)
-d = col_rotate(c, map(lambda xi: xi % m, range(n)))
-print(d)
-e = col_permute(d, composite_c2r_permutes(a))
-print(e)
+print(composite_c2r(a))
 
 # a = make_row_array(5, 32)
 # print(a)
