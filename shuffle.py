@@ -311,20 +311,6 @@ def composite_c2r(a):
 # a = make_col_array(m, n)
 # print(composite_c2r(a))
 
-def composite_r2c(a):
-    m, n = a.shape()
-    pre_permuted = col_permute(a, [0,4,1,5,2,3])
-    pre_rotated = col_rotate(pre_permuted, map(lambda xi: m - (xi % m), range(n)))
-    shuffled = row_shuffle(pre_rotated, r2c_golden_shuffles(pre_rotated))
-    post_rotated = col_rotate(shuffled, map(lambda xi: m - (xi/16), range(n)))
-    return post_rotated
-
-m = 14
-n = 32
-a = make_row_array(m, n)
-print(a)
-# print(composite_r2c(a))
-
 def reverse_permute(p):
     permutes = {}
     for (idx, pdx) in enumerate(p):
@@ -332,7 +318,42 @@ def reverse_permute(p):
     return [permutes[xi] for xi in range(len(p))]
 
 
-print reverse_permute(composite_c2r_permutes(a))
+def composite_r2c_shuffles(a):
+    m, n = a.shape()
+    c = fractions.gcd(m, n)
+    p = n / c
+    result = Array(m, n)
+    for col in range(n):
+        lb = (m * col) % n
+        ub = lb + m
+        rotate = col / p
+        idx = lb + rotate
+        for row in range(m):
+            result[row, col] = (idx) % n
+            idx += 1
+            if (idx == ub):
+                idx = lb
+            
+
+    return result
+    
+
+def composite_r2c(a):
+    m, n = a.shape()
+    c = fractions.gcd(m, n)
+    pre_permuted = col_permute(a, reverse_permute(composite_c2r_permutes(a)))
+    pre_rotated = col_rotate(pre_permuted, map(lambda xi: m - (xi % m), range(n)))
+    shuffled = row_shuffle(pre_rotated, composite_r2c_shuffles(a))
+    post_rotated = col_rotate(shuffled, map(lambda xi: m - (xi/(n/c)), range(n)))
+    return post_rotated
+
+m = 10
+n = 32
+a = make_row_array(m, n)
+print(a)
+print(composite_r2c(a))
+
+
         
 # a = make_row_array(5, 32)
 # print(a)
