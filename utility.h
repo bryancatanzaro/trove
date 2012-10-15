@@ -65,7 +65,7 @@ struct value_identity {
     static const T value = x;
 };
 
-template<typename T, template<T> class Fn, int x, int p=0>
+template<typename T, template<T> class Fn, T x, T p=0>
 struct inverse {
     static const T value =
         value_if<Fn<p>::value == x, T,
