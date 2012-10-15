@@ -112,7 +112,14 @@ struct composite_c2r_permute_fn {
     };
 };
 
-
+template<int m>
+struct composite_r2c_permute_fn {
+    template<int x>
+    struct eval {
+        static const int value =
+            inverse<int, composite_c2r_permute_fn<m>::template eval, x>::value;
+    };
+};
 
 
 template<typename Array>

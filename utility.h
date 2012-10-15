@@ -50,5 +50,27 @@ struct is_odd {
     static const bool value = (m & 1) == 1;
 };
 
+template<bool cond, typename T, typename Then, typename Else>
+struct value_if {
+    static const T value = Then::value;
+};
+
+template<typename T, typename Then, typename Else>
+struct value_if<false, T, Then, Else> {
+    static const T value = Else::value;
+};
+
+template<typename T, T x>
+struct value_identity {
+    static const T value = x;
+};
+
+template<typename T, template<T> class Fn, int x, int p=0>
+struct inverse {
+    static const T value =
+        value_if<Fn<p>::value == x, T,
+                 value_identity<T, p>, inverse<T, Fn, x, p+1> >::value;
+};
+
 
 }
