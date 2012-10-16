@@ -1,32 +1,24 @@
 #include <iostream>
 #include "transpose.h"
-#include "memory.h"
+#include "aos.h"
 #include "print_array.h"
+
 #include <thrust/device_vector.h>
+
+
 
 using namespace trove;
 
 template<int size, typename T>
 __global__ void test_c2r_transpose(T* r) {
     typedef array<T, size> Value;
-    typedef array<int, size> Indices;
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
-
-    Indices warp_offsets;
-    int rotation;
-    c2r_compute_indices(warp_offsets, rotation);
 
     Value data;
     data = counting_array<Value>::impl(
         global_index * size);
-    
-    c2r_warp_transpose(data, warp_offsets, rotation);
+    store_warp_contiguous(data, (array<T, size>*)r, global_index);
 
-    int warp_begin = threadIdx.x & (~WARP_MASK);
-    int warp_idx = threadIdx.x & WARP_MASK;
-    int warp_offset = (blockDim.x * blockIdx.x + warp_begin) * size;
-    T* warp_ptr = r + warp_offset;
-    warp_store(data, warp_ptr, warp_idx, 32);
 }
 
 
@@ -52,7 +44,7 @@ __global__ void test_r2c_transpose(T* r) {
     int warp_begin = threadIdx.x & (~WARP_MASK);
     int warp_offset = (blockDim.x * blockIdx.x + warp_begin) * size;
     T* warp_ptr = r + warp_offset;
-    warp_store(data, warp_ptr, warp_idx, 32);
+    warp_store(data, warp_ptr, warp_idx);
 }
 
 
@@ -98,7 +90,7 @@ __global__ void test_shared_c2r_transpose(T* r) {
     int warp_begin = threadIdx.x & (~WARP_MASK);
     int warp_offset = (blockDim.x * blockIdx.x + warp_begin) * size;
     T* warp_ptr = r + warp_offset;
-    warp_store(data, warp_ptr, warp_idx, 32);
+    warp_store(data, warp_ptr, warp_idx);
    
 }
 

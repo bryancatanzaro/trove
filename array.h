@@ -152,7 +152,7 @@ namespace detail {
 
 template<typename T, int s>
 struct make_array_impl {
-    typedef typename array<T, s>::type result_type;
+    typedef array<T, s> result_type;
     __host__ __device__
     static result_type impl(T ary[s]) {
         return result_type(ary[0],
