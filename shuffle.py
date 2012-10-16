@@ -347,11 +347,34 @@ def composite_r2c(a):
     post_rotated = col_rotate(shuffled, map(lambda xi: m - (xi/(n/c)), range(n)))
     return post_rotated
 
-m = 10
+
+def simple_r2c_po2_shuffle(a):
+    m, n = a.shape()
+    result = Array(m, n)
+    for col in range(n):
+        offset = (m * col + col / (n/m)) % n
+        lb = (offset/m)*m 
+        for row in range(m):
+            result[row, col] = offset
+            if (offset == lb):
+                offset += m - 1
+            else:
+                offset -= 1
+    return result
+
+m = 16
 n = 32
 a = make_row_array(m, n)
-print(a)
-print(composite_r2c(a))
+b = col_rotate(a, [xi % m for xi in range(0, n)])
+c = r2c_golden_shuffles(b)
+print(b)
+print(c)
+print simple_r2c_po2_shuffle(a)
+# m = 10
+# n = 32
+# a = make_row_array(m, n)
+# print(a)
+# print(composite_r2c(a))
 
 
         

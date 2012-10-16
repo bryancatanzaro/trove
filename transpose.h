@@ -290,7 +290,7 @@ struct r2c_compute_offsets_impl<array<int, s>, index, m, odd> {
 template<int index, int m>
 struct r2c_compute_offsets_impl<array<int, 0>, index, m, odd> {
     __device__
-    static array<int, 0> impl(int) {
+      static array<int, 0> impl(int) {
         return array<int, 0>();
     }
 };
@@ -300,23 +300,17 @@ template<int s, int index, int m>
 struct r2c_compute_offsets_impl<array<int, s>, index, m, power_of_two> {
     typedef array<int, s> Array;
     __device__
-    static Array impl(int initial_offset) {
-        int warp_id = threadIdx.x & WARP_MASK;
-    
-        const int logL = static_log<m>::value;
-        const int logP = LOG_WARP_SIZE;
-        int msb_bits = warp_id >> (logP - logL);
-        int lsb_bits = warp_id & ((1 << (logP - logL)) - 1);
-    
-        return Array((lsb_bits << logL) | ((msb_bits + m - index) % m),
-                     r2c_compute_offsets_impl<array<int, s-1>, index + 1, m, power_of_two>::impl(initial_offset));
+      static Array impl(int offset, int lb) {
+      int new_offset = (offset == lb) ? offset + m - 1 : offset - 1;
+        return Array(offset,
+                     r2c_compute_offsets_impl<array<int, s-1>, index + 1, m, power_of_two>::impl(new_offset, lb));
     }
 };
 
 template<int index, int m>
 struct r2c_compute_offsets_impl<array<int, 0>, index, m, power_of_two> {
     __device__
-    static array<int, 0> impl(int) {
+      static array<int, 0> impl(int, int) {
         return array<int, 0>();
     }
 };
@@ -476,12 +470,22 @@ struct r2c_compute_indices_impl<Array, odd> {
 
 template<typename Array>
 struct r2c_compute_indices_impl<Array, power_of_two> {
+    static const int m = Array::size;
+    static const int log_m = static_log<m>::value;
+    static const int clear_m = ~(m-1);
+    static const int n = WARP_SIZE;
+    static const int log_n = static_log<n>::value;
+    static const int mod_n = n-1;
+    static const int n_div_m = WARP_SIZE / m;
+    static const int log_n_div_m = static_log<n_div_m>::value;
     __device__ static void impl(Array& indices, int& rotation) {
         int warp_id = threadIdx.x & WARP_MASK;
         int size = Array::size;
         rotation = warp_id % size;
+        int initial_offset = ((warp_id << log_m) + (warp_id >> log_n_div_m)) & mod_n;
+        int lb = initial_offset & clear_m;
         indices = r2c_compute_offsets_impl<Array, 0,
-                                           Array::size, power_of_two>::impl(0);
+          Array::size, power_of_two>::impl(initial_offset, lb);
     }
 };
 
