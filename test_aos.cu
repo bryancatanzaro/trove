@@ -50,6 +50,26 @@ void verify_gather(thrust::device_vector<int>& d_i,
     }
 }
 
+template<typename T>
+void verify_scatter(thrust::device_vector<int>& d_i,
+                    thrust::device_vector<T>& d_s,
+                    thrust::device_vector<T>& d_r) {
+    thrust::host_vector<int> h_i = d_i;
+    thrust::host_vector<T> h_s = d_s;
+    thrust::host_vector<T> h_r = d_r;
+    bool fail = false;
+    for(int i = 0; i < h_r.size(); i++) {
+        if (h_r[h_i[i]] != h_s[i]) {
+            std::cout << "  Fail: r[" << h_i[i] << "] is " <<
+                h_r[h_i[i]] << std::endl;
+            fail = true;
+        }
+    }
+    if (!fail) {
+        std::cout << "Pass!" << std::endl;
+    }
+}
+
 template<typename T, int i>
 void print_warp_result(const thrust::device_vector<T> e) {
     thrust::host_vector<int> f = e;
@@ -83,20 +103,17 @@ thrust::device_vector<int> make_random_permutation(int s) {
 template<typename T>
 void test_gather() {
     std::cout << "Testing gather" << std::endl;
-    // int n_blocks = 15 * 8 * 100;
-    // int block_size = 256;
-    int n_blocks = 1;
-    int block_size = 32;
+    int n_blocks = 15 * 8 * 100;
+    int block_size = 256;
     int n = n_blocks * block_size;
     int i = trove::detail::size_in_ints<T>::value;
     thrust::device_vector<int> d_s(n*i);
     thrust::counting_iterator<int> begin(0);
     thrust::counting_iterator<int> end = begin + n*i;
     thrust::copy(begin, end, d_s.begin());
-    T* s_begin = (T*)thrust::raw_pointer_cast(d_s.data());
+    thrust::device_ptr<T> s_begin((T*)thrust::raw_pointer_cast(d_s.data()));
     thrust::device_vector<T> s(n);
     thrust::copy(s_begin, s_begin + n, s.begin());
-    
     thrust::device_vector<T> r(n);
     thrust::device_vector<int> indices = make_random_permutation(n);
     test_aos_gather
@@ -106,8 +123,33 @@ void test_gather() {
     verify_gather(indices, s, r);
 };
 
-  
+template<typename T>
+void test_scatter() {
+    std::cout << "Testing scatter" << std::endl;
+    int n_blocks = 15 * 8 * 100;
+    int block_size = 256;
+    int n = n_blocks * block_size;
+    int i = trove::detail::size_in_ints<T>::value;
+    thrust::device_vector<int> d_s(n*i);
+    thrust::counting_iterator<int> begin(0);
+    thrust::counting_iterator<int> end = begin + n*i;
+    thrust::copy(begin, end, d_s.begin());
+    thrust::device_ptr<T> s_begin((T*)thrust::raw_pointer_cast(d_s.data()));
+    thrust::device_vector<T> s(n);
+    thrust::copy(s_begin, s_begin + n, s.begin());
+    thrust::device_vector<T> r(n);
+    thrust::device_vector<int> indices = make_random_permutation(n);
+    test_aos_scatter
+        <<<n_blocks, block_size>>>(thrust::raw_pointer_cast(indices.data()),
+            thrust::raw_pointer_cast(s.data()),
+            thrust::raw_pointer_cast(r.data()));
+    verify_scatter(indices, s, r);
+};
+
+
+
 int main() {
-    test_gather<array<int, 4> >();
+    test_gather<array<int, 5> >();
+    test_scatter<array<int, 5> >();
 }
 
