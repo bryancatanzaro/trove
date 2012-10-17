@@ -22,6 +22,14 @@ struct array {
         tail = other.tail;
         return *this;
     }
+    __host__ __device__
+    bool operator==(const array& other) {
+        return (head == other.head) && (tail == other.tail);
+    }
+    __host__ __device__
+    bool operator!=(const array& other) {
+        return !operator==(other);
+    }
 };
 
 template<typename T>
@@ -41,7 +49,14 @@ struct array<T, 1> {
         head = other.head;
         return *this;
     }
-
+    __host__ __device__
+    bool operator==(const array& other) {
+        return (head == other.head);
+    }
+    __host__ __device__
+    bool operator!=(const array& other) {
+        return !operator==(other);
+    }
 };
 
 template<typename T>

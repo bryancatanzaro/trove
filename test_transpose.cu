@@ -17,7 +17,7 @@ __global__ void test_c2r_transpose(T* r) {
     Value data;
     data = counting_array<Value>::impl(
         global_index * size);
-    store_warp_contiguous(data, (array<T, size>*)r, global_index);
+    store_aos_warp_contiguous(data, (array<T, size>*)r, global_index);
 
 }
 
@@ -27,8 +27,8 @@ __global__ void test_r2c_transpose(T* s, T* r) {
     typedef array<T, size> Value;
 
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
-    Value data = load_warp_contiguous((array<T, size>*)s, global_index);
-    store_warp_contiguous(data, (array<T, size>*)r, global_index);
+    Value data = load_aos_warp_contiguous((array<T, size>*)s, global_index);
+    store_aos_warp_contiguous(data, (array<T, size>*)r, global_index);
 }
 
 
