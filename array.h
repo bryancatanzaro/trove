@@ -25,7 +25,27 @@ struct array {
 };
 
 template<typename T>
-struct array<T, 0> {};
+struct array<T, 1> {
+    typedef T value_type;
+    typedef T head_type;
+    static const int size = 1;
+    head_type head;
+    __host__ __device__
+    array(head_type h) : head(h){}
+    __host__ __device__
+    array() : head() {}
+    __host__ __device__
+    array(const array& other) : head(other.head) {}
+    __host__ __device__
+    array& operator=(const array& other) {
+        head = other.head;
+        return *this;
+    }
+
+};
+
+template<typename T>
+struct array<T, 0>{};
 
 namespace detail {
 
@@ -72,7 +92,7 @@ array<T, 0> make_array() {
 template<typename T>
 __host__ __device__
 array<T, 1> make_array(T a0) {
-    return array<T, 1>(a0, make_array<T>());
+    return array<T, 1>(a0);
 }
 
 template<typename T>
@@ -161,12 +181,25 @@ struct make_array_impl {
 };
 
 template<typename T>
-struct make_array_impl<T, 0> {
+struct make_array_impl<T, 1> {
+    typedef array<T, 1> result_type;
     __host__ __device__
-    static array<T, 0> impl(T ary[0]) {
-        return array<T, 0>();
+    static result_type impl(T ary[1]) {
+        return result_type(ary[0]);
     }
 };
+
+template<typename T>
+struct make_array_impl<T, 0> {
+    typedef array<T, 0> result_type;
+    __host__ __device__
+    static result_type impl(T ary[0]) {
+        return result_type();
+    }
+};
+
+
+
 
 template<typename T, int s>
 struct make_carray_impl {
@@ -177,6 +210,16 @@ struct make_carray_impl {
         make_carray_impl<T, s-1>::impl(ary.tail, result+1);
     }
 };
+
+template<typename T>
+struct make_carray_impl<T, 1> {
+    typedef array<T, 1> array_type;
+    __host__ __device__
+    static void impl(const array_type& ary, T result[1]) {
+        result[0] = ary.head;
+    }
+};
+
 
 template<typename T>
 struct make_carray_impl<T, 0> {

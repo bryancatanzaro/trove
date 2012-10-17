@@ -23,28 +23,12 @@ __global__ void test_c2r_transpose(T* r) {
 
 
 template<int size, typename T>
-__global__ void test_r2c_transpose(T* r) {
+__global__ void test_r2c_transpose(T* s, T* r) {
     typedef array<T, size> Value;
-    typedef array<int, size> Indices;
-  
-    int global_warp_id = (threadIdx.x >> LOG_WARP_SIZE) + (blockDim.x >> LOG_WARP_SIZE) * blockIdx.x;
-    int warp_idx = threadIdx.x & WARP_MASK;
-    int start_value = ((global_warp_id * size) << LOG_WARP_SIZE) + warp_idx;
-    
-    Indices warp_offsets;
-    int rotation;
-    r2c_compute_indices(warp_offsets, rotation);
 
-    Value data;
-    data = counting_array<Value>::impl(
-        start_value, WARP_SIZE);
-    
-    r2c_warp_transpose(data, warp_offsets, rotation);
-
-    int warp_begin = threadIdx.x & (~WARP_MASK);
-    int warp_offset = (blockDim.x * blockIdx.x + warp_begin) * size;
-    T* warp_ptr = r + warp_offset;
-    warp_store(data, warp_ptr, warp_idx);
+    int global_index = threadIdx.x + blockDim.x * blockIdx.x;
+    Value data = load_warp_contiguous((array<T, size>*)s, global_index);
+    store_warp_contiguous(data, (array<T, size>*)r, global_index);
 }
 
 
@@ -97,44 +81,13 @@ __global__ void test_shared_c2r_transpose(T* r) {
 
 
 template<typename T>
-void verify_c2r(thrust::device_vector<T>& d_r) {
+void verify(thrust::device_vector<T>& d_r) {
     thrust::host_vector<T> h_r = d_r;
     bool fail = false;
     for(int i = 0; i < h_r.size(); i++) {
         if (h_r[i] != i) {
             std::cout << "  Fail: r[" << i << "] is " << h_r[i] << std::endl;
             fail = true;
-        }
-    }
-    if (!fail) {
-        std::cout << "Pass!" << std::endl;
-    }
-}
-
-template<int size, typename T>
-void verify_r2c(thrust::device_vector<T>& d_r) {
-    thrust::host_vector<T> h_r = d_r;
-    bool fail = false;
-
-    int expected = 0;
-    int warp_index = 0;
-    int row_index = 0;
-    for(int i = 0; i < h_r.size(); i++) {
-        if (h_r[i] != expected) {
-            std::cout << "  Fail: r[" << i << "] is " << h_r[i]
-                      << " (expected " << expected << ")" << std::endl;
-            fail = true;
-        }
-        expected += size;
-        warp_index++;
-        if (warp_index == 32) {
-            expected -= 32 * size - 1;
-            warp_index = 0;
-            row_index++;
-            if (row_index == size) {
-                row_index = 0;
-                expected += 31 * size;
-            }
         }
     }
     if (!fail) {
@@ -191,7 +144,7 @@ struct test_c2r {
         thrust::device_vector<int> e(n_blocks*block_size*i);
         test_c2r_transpose<i>
             <<<n_blocks, block_size>>>(thrust::raw_pointer_cast(e.data()));
-        verify_c2r(e);
+        verify(e);
     }
 };
 
@@ -202,10 +155,16 @@ struct test_r2c {
             i << " elements per thread" << std::endl;
         int n_blocks = 15 * 8 * 100;
         int block_size = 256;
-        thrust::device_vector<int> e(n_blocks*block_size*i);
+        thrust::device_vector<int> s(n_blocks*block_size*i);
+        thrust::counting_iterator<int> begin(0);
+        thrust::counting_iterator<int> end = begin + n_blocks*block_size*i;
+        thrust::copy(begin, end, s.begin());
+        thrust::device_vector<int> d(n_blocks*block_size*i);
         test_r2c_transpose<i>
-            <<<n_blocks, block_size>>>(thrust::raw_pointer_cast(e.data()));
-        verify_r2c<i>(e);
+            <<<n_blocks, block_size>>>(
+                thrust::raw_pointer_cast(s.data()),
+                thrust::raw_pointer_cast(d.data()));
+        verify(d);
     }
 };
 

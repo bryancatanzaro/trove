@@ -19,9 +19,12 @@ struct warp_store_array<array<T, s> > {
 };
 
 template<typename T>
-struct warp_store_array<array<T, 0> > {
+struct warp_store_array<array<T, 1> > {
     __host__ __device__ static void impl(
-        array<T, 0>, T*, int, int) {}
+        const array<T, 1>& d,
+        T* ptr, int offset, int stride) {
+        ptr[offset] = d.head;
+    }
 };
 
 template<typename Array>
@@ -50,11 +53,21 @@ struct uncoalesced_store_array<array<T, s> > {
 };
 
 template<typename T>
-struct uncoalesced_store_array<array<T, 0> > {
+struct uncoalesced_store_array<array<T, 1> > {
     __host__ __device__ static void impl(
-        array<T, 0>, T*, int, int) {}
+        const array<T, 1>& d,
+        T* ptr,
+        int offset=0,
+        int stride=1) {
+        ptr[offset] = d.head;
+    }
     __host__ __device__ static void impl(
-        array<T, 0>, volatile T*, int, int) {}
+        const array<T, 1>& d,
+        volatile T* ptr,
+        int offset=0,
+        int stride=1) {
+        ptr[offset] = d.head;
+    }
 };
 
 template<typename Array>
@@ -77,14 +90,16 @@ struct warp_load_array<array<T, s> > {
 };
 
 template<typename T>
-struct warp_load_array<array<T, 0> > {
-    __host__ __device__ static array<T, 0> impl(
-        T*, int, int) {
-        return array<T, 0>();
+struct warp_load_array<array<T, 1> > {
+    __host__ __device__ static array<T, 1> impl(T* ptr,
+                                                int offset,
+                                                int stride=32) {
+        return array<T, 1>(ptr[offset]);
     }
-    __host__ __device__ static array<T, 0> impl(
-        volatile T*, int, int) {
-        return array<T, 0>();
+    __host__ __device__ static array<T, 1> impl(volatile T* ptr,
+                                                int offset,
+                                                int stride=32) {
+        return array<T, 1>(ptr[offset]);
     }
 };
 

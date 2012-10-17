@@ -84,11 +84,13 @@ struct tx_permute_impl<array<T, s>, Permute, position> {
 };
 
 template<typename T, template<int> class Permute, int position>
-struct tx_permute_impl<array<T, 0>, Permute, position> {
+struct tx_permute_impl<array<T, 1>, Permute, position> {
+    typedef array<T, 1> Remaining;
+    static const int idx = Permute<position>::value;
     template<typename Source>
     __host__ __device__
-    static array<T, 0> impl(const Source&) {
-        return array<T, 0>();
+    static Remaining impl(const Source& src) {
+        return Remaining(trove::get<idx>(src));
     }
 };
 
@@ -175,10 +177,14 @@ struct c2r_compute_offsets_impl<array<int, s>, b, o> {
 };
 
 template<int b, int o>
-struct c2r_compute_offsets_impl<array<int, 0>, b, o> {
+struct c2r_compute_offsets_impl<array<int, 1>, b, o> {
+    typedef array<int, 1> Array;
     __device__
-    static array<int, 0> impl(int) {
-        return array<int, 0>();
+    static Array impl(int offset) {
+        if (offset >= b) {
+            offset -= b;
+        } //Poor man's x % b. Requires that o < b.
+        return Array(offset);
     }
 };
 
@@ -259,9 +265,22 @@ struct c2r_compute_composite_offsets<array<int, s>, m, p> {
 };
 
 template<int m, int p>
-struct c2r_compute_composite_offsets<array<int, 0>, m, p> {
-    __host__ __device__ static array<int, 0> impl(int, int) {
-        return array<int, 0>();
+struct c2r_compute_composite_offsets<array<int, 1>, m, p> {
+    static const int n = WARP_SIZE;
+    static const int mod_n = n - 1;
+    static const int c = static_gcd<m, WARP_SIZE>::value;
+    static const int k = static_mod_inverse<m/c, n/c>::value;
+    static const int mod_c = c - 1;
+    static const int log_c = static_log<c>::value;
+    static const int n_div_c = n / c;
+    static const int mod_n_div_c = n_div_c - 1;
+    static const int log_n_div_c = static_log<n_div_c>::value;
+    typedef array<int, 1> result_type;
+    __host__ __device__ static result_type impl(int idx, int col) {
+        int offset = ((((idx >> log_c) * k) & mod_n_div_c) +
+                      ((idx & mod_c) << log_n_div_c)) & mod_n;
+        return result_type(offset);
+                           
     }
 };
 
@@ -288,10 +307,13 @@ struct r2c_compute_offsets_impl<array<int, s>, index, m, odd> {
 };
 
 template<int index, int m>
-struct r2c_compute_offsets_impl<array<int, 0>, index, m, odd> {
+struct r2c_compute_offsets_impl<array<int, 1>, index, m, odd> {
+    typedef array<int, 1> Array;
+    static const int offset = (WARP_SIZE % m * index) % m;
     __device__
-      static array<int, 0> impl(int) {
-        return array<int, 0>();
+    static Array impl(int initial_offset) {
+        int current_offset = (initial_offset + offset) & WARP_MASK;
+        return Array(current_offset);
     }
 };
 
@@ -308,10 +330,11 @@ struct r2c_compute_offsets_impl<array<int, s>, index, m, power_of_two> {
 };
 
 template<int index, int m>
-struct r2c_compute_offsets_impl<array<int, 0>, index, m, power_of_two> {
+struct r2c_compute_offsets_impl<array<int, 1>, index, m, power_of_two> {
+    typedef array<int, 1> Array;
     __device__
-      static array<int, 0> impl(int, int) {
-        return array<int, 0>();
+    static Array impl(int offset, int lb) {
+        return Array(offset);
     }
 };
 
@@ -339,9 +362,16 @@ struct r2c_compute_composite_offsets<array<int, s>, m> {
 };
 
 template<int m>
-struct r2c_compute_composite_offsets<array<int, 0>, m> {
-    __host__ __device__ static array<int, 0> impl(int, int, int, int) {
-        return array<int, 0>();
+struct r2c_compute_composite_offsets<array<int, 1>, m> {
+    static const int n = WARP_SIZE;
+    static const int mod_n = n - 1;
+    static const int c = static_gcd<m, WARP_SIZE>::value;
+    static const int n_div_c = n / c;
+    static const int log_n_div_c = static_log<n_div_c>::value;
+    typedef array<int, 1> result_type;
+    __host__ __device__ static result_type impl(int col, int offset, int lb, int ub) {
+        return  result_type(offset & mod_n);
+                           
     }
 };
 
@@ -370,8 +400,11 @@ struct warp_shuffle<array<T, m>, array<int, m> > {
 };
 
 template<typename T>
-struct warp_shuffle<array<T, 0>, array<int, 0> > {
-    __device__ static void impl(array<T, 0>, array<int, 0>) {}
+struct warp_shuffle<array<T, 1>, array<int, 1> > {
+    __device__ static void impl(array<T, 1>& d,
+                                const array<int, 1>& i) {
+        d.head = __shfl(d.head, i.head);
+    }
 };
 
 

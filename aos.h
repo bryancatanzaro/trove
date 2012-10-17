@@ -27,6 +27,7 @@ __device__ void store_warp_contiguous(const T& data, T* dest, I idx) {
     int_store lysed = lyse(data);
     c2r_warp_transpose(lysed);
     warp_store(lysed, as_int_dest, warp_id);
+    
 }
 
 }

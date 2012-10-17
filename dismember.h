@@ -21,10 +21,12 @@ struct dismember {
 };
 
 template<typename T>
-struct dismember<T, 0> {
+struct dismember<T, 1> {
+    typedef array<int, 1> result_type;
+    static const int idx = size_in_ints<T>::value - 1;
     __host__ __device__
-    static array<int, 0> impl(const T&) {
-        return array<int, 0>();
+    static result_type impl(const T& t) {
+        return result_type(((const int*)&t)[idx]);
     }
 };
 
@@ -40,9 +42,12 @@ struct remember {
 };
 
 template<typename T>
-struct remember<T, 0> {
+struct remember<T, 1> {
+    static const int idx = size_in_ints<T>::value - 1;
     __host__ __device__
-    static void impl(const array<int, 0>&, const T&) {}
+    static void impl(const array<int, 1>& d, const T& t) {
+        ((int*)&t)[idx] = d.head;
+    }
 };
 
 

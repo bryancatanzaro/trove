@@ -17,10 +17,10 @@ struct counting_array<array<T, s> > {
 };
 
 template<typename T>
-struct counting_array<array<T, 0> > {
+struct counting_array<array<T, 1> > {
     __host__ __device__
-    static array<T, 0> impl(T, T) {
-        return make_array<T>();
+    static array<T, 1> impl(T v, T) {
+        return make_array(v);
     }
 };
 
