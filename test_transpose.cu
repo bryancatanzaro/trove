@@ -95,26 +95,6 @@ void verify(thrust::device_vector<T>& d_r) {
     }
 }
 
-struct null_type{};
-
-template<typename T, T i, typename Tail=null_type>
-struct cons_c {
-    static const T head = i;
-    typedef Tail tail;
-};
-
-template<int k, int l>
-struct static_range {
-    static const int head = k;
-    typedef static_range<k+1, l> tail;
-};
-
-template<int f>
-struct static_range<f, f> {
-    static const int head = f;
-    typedef null_type tail;
-};
-
 typedef static_range<2, 16> c2r_arities;
 
 typedef static_range<2, 16> r2c_arities;
