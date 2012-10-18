@@ -207,7 +207,7 @@ void run_benchmark_random(const std::string name, const thrust::device_vector<in
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time, start, stop);
-    float gbs = (float)(sizeof(T) * (iterations * n_blocks * block_size)) / (time * 1000000);
+    float gbs = (float)(sizeof(T) * (2 * iterations * n_blocks * block_size)) / (time * 1000000);
     std::cout << gbs << std::endl;
 }
 
