@@ -1,5 +1,5 @@
 #pragma once
-#include "array.h"
+#include <trove/array.h>
 
 namespace trove {
 namespace detail {
@@ -51,8 +51,6 @@ struct remember<T, 1> {
 };
 
 
-}
-
 template<typename T>
 __host__ __device__
 array<int, detail::size_in_ints<T>::value> lyse(const T& in) {
@@ -67,4 +65,5 @@ T fuse(const array<int, detail::size_in_ints<T>::value>& in) {
     return result;
 }
 
+}
 }

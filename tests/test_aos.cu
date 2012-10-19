@@ -5,9 +5,9 @@
 #include <thrust/generate.h>
 #include <cstdlib>
 
-#include "transpose.h"
-#include "aos.h"
-#include "print_array.h"
+#include <trove/transpose.h>
+#include <trove/aos.h>
+#include <trove/print_array.h>
 
 #include <thrust/device_vector.h>
 

@@ -1,7 +1,6 @@
 #pragma once
 
 namespace trove {
-namespace detail {
 
 template<int a, int m, int r=1>
 struct static_mod_inverse;
@@ -25,5 +24,4 @@ struct static_mod_inverse {
     static const int value = static_mod_inverse_helper<done, a, m, r>::value;
 };
 
-}
 }

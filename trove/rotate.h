@@ -1,4 +1,5 @@
 #pragma once
+#include <trove/array.h>
 
 namespace trove {
 namespace detail {
@@ -80,10 +81,10 @@ struct rotate_impl {
 
 } //ends namespace detail
 
-template<typename Array>
+template<typename T, int i>
 __host__ __device__
-Array rotate(const Array& t, int a) {
-    return detail::rotate_impl<Array, 1>::impl(t, a);
+array<T, i> rotate(const array<T, i>& t, int a) {
+    return detail::rotate_impl<array<T, i>, 1>::impl(t, a);
 }
 
 } //ends namespace trove

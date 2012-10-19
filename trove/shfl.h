@@ -1,10 +1,7 @@
 #pragma once
-#include "dismember.h"
+#include <trove/array.h>
+#include <trove/detail/dismember.h>
 
-
-#if __CUDA_ARCH__ < 300
-#include "shfl_sm_10.h"
-#else
 
 namespace trove {
 namespace detail {
@@ -32,11 +29,10 @@ struct shuffle<1> {
 template<typename T>
 __device__
 T __shfl(const T& t, const int& i) {
-    typedef array<int, detail::size_in_ints<T>::value> lysed_array;
-    lysed_array lysed = lyse(t);
-    trove::detail::shuffle<lysed_array>
+    typedef trove::array<int,
+                         trove::detail::size_in_ints<T>::value> lysed_array;
+    lysed_array lysed = trove::detail::lyse(t);
+    trove::detail::shuffle<lysed_array::size>
       ::impl(lysed, i);
-    return fuse<T>(lysed);
+    return trove::detail::fuse<T>(lysed);
 }
-
-#endif

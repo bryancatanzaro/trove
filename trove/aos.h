@@ -1,7 +1,7 @@
 #pragma once
-#include "memory.h"
-#include "dismember.h"
-#include "transpose.h"
+#include <trove/memory.h>
+#include <trove/detail/dismember.h>
+#include <trove/transpose.h>
 
 namespace trove {
 
@@ -14,7 +14,7 @@ __device__ T load_aos_warp_contiguous(const T* src, const I& idx) {
     typedef array<int, detail::size_in_ints<T>::value> int_store;
     int_store loaded = warp_load<int_store>(as_int_src, warp_id);
     r2c_warp_transpose(loaded);
-    return fuse<T>(loaded);
+    return detail::fuse<T>(loaded);
 }
 
 template<typename T, typename I>
@@ -24,7 +24,7 @@ __device__ void store_aos_warp_contiguous(const T& data, T* dest, const I& idx) 
     T* warp_begin_dest = dest + warp_begin_idx;
     int* as_int_dest = (int*)warp_begin_dest;
     typedef array<int, detail::size_in_ints<T>::value> int_store;
-    int_store lysed = lyse(data);
+    int_store lysed = detail::lyse(data);
     c2r_warp_transpose(lysed);
     warp_store(lysed, as_int_dest, warp_id);
     
@@ -101,14 +101,14 @@ __device__ T load_aos(const T* src, const I& idx) {
         detail::indexed_load<detail::size_in_ints<T>::value,
                              T, I>::impl(src, idx, warp_id);
     r2c_warp_transpose(loaded);
-    return fuse<T>(loaded);
+    return detail::fuse<T>(loaded);
 }
 
 template<typename T, typename I>
 __device__ void store_aos(const T& data, T* dest, const I& idx) {
     int warp_id = threadIdx.x & WARP_MASK;
     typedef array<int, detail::size_in_ints<T>::value> int_store;
-    int_store lysed = lyse(data);
+    int_store lysed = detail::lyse(data);
     c2r_warp_transpose(lysed);
     detail::indexed_store<detail::size_in_ints<T>::value,
                           T, I>::impl(lysed, dest, idx, warp_id);

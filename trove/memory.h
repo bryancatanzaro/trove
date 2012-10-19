@@ -1,5 +1,6 @@
 #pragma once
-#include "utility.h"
+#include <trove/utility.h>
+#include <trove/array.h>
 
 namespace trove {
 namespace detail {

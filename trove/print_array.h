@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <trove/array.h>
 
 namespace trove {
 

@@ -4,9 +4,9 @@
 #include <thrust/generate.h>
 #include <thrust/sort.h>
 #include <cstdlib>
-#include "transpose.h"
-#include "aos.h"
-#include "print_array.h"
+#include <trove/transpose.h>
+#include <trove/aos.h>
+#include <trove/print_array.h>
 
 #include <thrust/device_vector.h>
 
@@ -207,7 +207,7 @@ void run_benchmark_random(const std::string name, const thrust::device_vector<in
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time, start, stop);
-    float gbs = (float)(sizeof(T) * (2 * iterations * n_blocks * block_size)) / (time * 1000000);
+    float gbs = (float)(sizeof(T) * (2 * iterations * n_blocks * block_size) + sizeof(int) * iterations * n_blocks * block_size) / (time * 1000000);
     std::cout << gbs << std::endl;
 }
 

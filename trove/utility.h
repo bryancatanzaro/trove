@@ -1,5 +1,5 @@
 #pragma once
-#include "array.h"
+#include <trove/array.h>
 
 namespace trove {
 

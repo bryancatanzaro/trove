@@ -1,9 +1,9 @@
 #pragma once
-#include "utility.h"
-#include "rotate.h"
-#include "shfl.h"
-#include "static_mod_inverse.h"
-#include "static_gcd.h"
+#include <trove/utility.h>
+#include <trove/rotate.h>
+#include <trove/shfl.h>
+#include <trove/static_mod_inverse.h>
+#include <trove/static_gcd.h>
 
 #define WARP_SIZE 32
 #define WARP_MASK 0x1f
