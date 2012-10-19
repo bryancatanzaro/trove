@@ -582,66 +582,72 @@ struct r2c_warp_transpose_impl<Array, Indices, composite> {
 
 } //end namespace detail
 
-template<typename Array>
-__device__ void c2r_compute_indices(Array& indices, int& rotation) {
+template<int i>
+__device__ void c2r_compute_indices(array<int, i>& indices, int& rotation) {
+    typedef array<int, i> Array;
     detail::c2r_compute_indices_impl<
         Array,
-        typename detail::tx_algorithm<Array::size>::type>
+        typename detail::tx_algorithm<i>::type>
         ::impl(indices, rotation);
     
 }
 
-template<typename Array>
-__device__ void c2r_warp_transpose(Array& src,
-                                   const array<int, Array::size>& indices,
-                                   int rotation) {  
+template<typename T, int i>
+__device__ void c2r_warp_transpose(array<T, i>& src,
+                                   const array<int, i>& indices,
+                                   int rotation) {
+    typedef array<T, i> Array;
     detail::c2r_warp_transpose_impl<
-        Array, array<int, Array::size>,
-        typename detail::tx_algorithm<Array::size>::type>::
+        Array, array<int, i>,
+        typename detail::tx_algorithm<i>::type>::
         impl(src, indices, rotation);
 }
 
-template<typename Array>
-__device__ void c2r_warp_transpose(Array& src) {
-    typedef array<int, Array::size> indices_array;
+template<typename T, int i>
+__device__ void c2r_warp_transpose(array<T, i>& src) {
+    typedef array<T, i> Array;
+    typedef array<int, i> indices_array;
     indices_array indices;
     int rotation;
     c2r_compute_indices(indices, rotation);
 
     detail::c2r_warp_transpose_impl<
-        Array, array<int, Array::size>,
-        typename detail::tx_algorithm<Array::size>::type>::
+        Array, array<int, i>,
+        typename detail::tx_algorithm<i>::type>::
         impl(src, indices, rotation);
 }
 
-template<typename Array>
-__device__ void r2c_compute_indices(Array& indices, int& rotation) {
+template<int i>
+__device__ void r2c_compute_indices(array<int, i>& indices, int& rotation) {
+    typedef array<int, i> Array;
     detail::r2c_compute_indices_impl<
-        Array, typename detail::tx_algorithm<Array::size>::type>
+        Array, typename detail::tx_algorithm<i>::type>
         ::impl(indices, rotation);
 
 }
 
-template<typename Array>
-__device__ void r2c_warp_transpose(Array& src,
-                                   const array<int, Array::size>& indices,
+template<typename T, int i>
+__device__ void r2c_warp_transpose(array<T, i>& src,
+                                   const array<int, i>& indices,
                                    int rotation) {
+    typedef array<T, i> Array;
     detail::r2c_warp_transpose_impl<
-        Array, array<int, Array::size>,
-        typename detail::tx_algorithm<Array::size>::type>
+        Array, array<int, i>,
+        typename detail::tx_algorithm<i>::type>
     ::impl(src, indices, rotation);
 }
 
-template<typename Array>
-__device__ void r2c_warp_transpose(Array& src) {
-    typedef array<int, Array::size> indices_array;
+template<typename T, int i>
+__device__ void r2c_warp_transpose(array<T, i>& src) {
+    typedef array<T, i> Array;
+    typedef array<int, i> indices_array;
     indices_array indices;
     int rotation;
     r2c_compute_indices(indices, rotation);
     
     detail::r2c_warp_transpose_impl<
-        Array, array<int, Array::size>,
-        typename detail::tx_algorithm<Array::size>::type>
+        Array, array<int, i>,
+        typename detail::tx_algorithm<i>::type>
     ::impl(src, indices, rotation);
 }
 
