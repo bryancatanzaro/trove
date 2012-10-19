@@ -8,4 +8,4 @@ test_aos: test_aos.cu
 	nvcc -arch=$(ARCH) -Xptxas -v test_aos.cu -o test_aos --maxrregcount=32
 
 benchmark: benchmark.cu
-	nvcc -arch=$(ARCH) -Xptxas -v benchmark.cu -o benchmark --maxrregcount=32
+	nvcc -arch=$(ARCH) -Xptxas -v benchmark.cu -o benchmark

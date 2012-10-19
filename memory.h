@@ -75,13 +75,13 @@ struct warp_load_array{};
 
 template<typename T, int s>
 struct warp_load_array<array<T, s> > {
-    __host__ __device__ static array<T, s> impl(T* ptr,
+    __host__ __device__ static array<T, s> impl(const T* ptr,
                                                 int offset,
                                                 int stride=32) {
         return array<T, s>(ptr[offset],
                            warp_load_array<array<T, s-1> >::impl(ptr, offset+stride, stride));
     }
-    __host__ __device__ static array<T, s> impl(volatile T* ptr,
+    __host__ __device__ static array<T, s> impl(const volatile T* ptr,
                                                 int offset,
                                                 int stride=32) {
         return array<T, s>(ptr[offset],
@@ -91,12 +91,12 @@ struct warp_load_array<array<T, s> > {
 
 template<typename T>
 struct warp_load_array<array<T, 1> > {
-    __host__ __device__ static array<T, 1> impl(T* ptr,
+    __host__ __device__ static array<T, 1> impl(const T* ptr,
                                                 int offset,
                                                 int stride=32) {
         return array<T, 1>(ptr[offset]);
     }
-    __host__ __device__ static array<T, 1> impl(volatile T* ptr,
+    __host__ __device__ static array<T, 1> impl(const volatile T* ptr,
                                                 int offset,
                                                 int stride=32) {
         return array<T, 1>(ptr[offset]);
@@ -113,14 +113,15 @@ __host__ __device__ void warp_store(const Array& t,
 }
 
 template<typename Array>
-__host__ __device__ Array warp_load(typename Array::head_type* ptr,
+__host__ __device__ Array warp_load(const typename Array::head_type* ptr,
                                     int offset, int stride=32) {
     return detail::warp_load_array<Array>::impl(ptr, offset, stride);
 }
 
 template<typename Array>
-__host__ __device__ Array warp_load(volatile typename Array::head_type* ptr,
-                                    int offset, int stride=32) {
+__host__ __device__ Array warp_load(
+    const volatile typename Array::head_type* ptr,
+    int offset, int stride=32) {
     return detail::warp_load_array<Array>::impl(ptr, offset, stride);
 }
 

@@ -6,11 +6,11 @@
 namespace trove {
 
 template<typename T, typename I>
-__device__ T load_aos_warp_contiguous(T* src, I idx) {
+__device__ T load_aos_warp_contiguous(const T* src, const I& idx) {
     int warp_id = threadIdx.x & WARP_MASK;
     I warp_begin_idx = idx - warp_id;
-    T* warp_begin_src = src + warp_begin_idx;
-    int* as_int_src = (int*)warp_begin_src;
+    const T* warp_begin_src = src + warp_begin_idx;
+    const int* as_int_src = (const int*)warp_begin_src;
     typedef array<int, detail::size_in_ints<T>::value> int_store;
     int_store loaded = warp_load<int_store>(as_int_src, warp_id);
     r2c_warp_transpose(loaded);
@@ -18,7 +18,7 @@ __device__ T load_aos_warp_contiguous(T* src, I idx) {
 }
 
 template<typename T, typename I>
-__device__ void store_aos_warp_contiguous(const T& data, T* dest, I idx) {
+__device__ void store_aos_warp_contiguous(const T& data, T* dest, const I& idx) {
     int warp_id = threadIdx.x & WARP_MASK;
     I warp_begin_idx = idx - warp_id;
     T* warp_begin_dest = dest + warp_begin_idx;
@@ -45,7 +45,8 @@ __device__ int* compute_address(T* src, const I& src_index, int impl_index) {
 template<int s, typename T, typename I>
 struct indexed_load {
     __device__
-    static array<int, s> impl(T* src, const I& src_index, int impl_index) {
+    static array<int, s> impl(const T* src,
+                              const I& src_index, int impl_index) {
         int result;
         int* address = compute_address(src, src_index, impl_index);
         if (address != NULL) result = *address;
@@ -59,7 +60,8 @@ struct indexed_load {
 template<typename T, typename I>
 struct indexed_load<1, T, I> {
     __device__
-    static array<int, 1> impl(T* src, const I& src_index, int impl_index) {
+    static array<int, 1> impl(const T* src,
+                              const I& src_index, int impl_index) {
         int result;
         int* address = compute_address(src, src_index, impl_index);
         if (address != NULL) result = *address;
@@ -92,7 +94,7 @@ struct indexed_store<1, T, I> {
 }
 
 template<typename T, typename I>
-__device__ T load_aos(T* src, I idx) {
+__device__ T load_aos(const T* src, const I& idx) {
     int warp_id = threadIdx.x & WARP_MASK;
     typedef array<int, detail::size_in_ints<T>::value> int_store;
     int_store loaded =
@@ -103,7 +105,7 @@ __device__ T load_aos(T* src, I idx) {
 }
 
 template<typename T, typename I>
-__device__ void store_aos(const T& data, T* dest, I idx) {
+__device__ void store_aos(const T& data, T* dest, const I& idx) {
     int warp_id = threadIdx.x & WARP_MASK;
     typedef array<int, detail::size_in_ints<T>::value> int_store;
     int_store lysed = lyse(data);
