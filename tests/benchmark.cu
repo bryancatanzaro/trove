@@ -9,7 +9,7 @@
 #include <trove/print_array.h>
 
 #include <thrust/device_vector.h>
-
+#include <thrust/equal.h>
 
 
 using namespace trove;
@@ -81,7 +81,8 @@ __global__ void benchmark_direct_scatter(const int* indices, T* s, T* r) {
 }
 
 template<int i>
-void run_benchmark_contiguous_store(const std::string name, void (*fn)(array<int, i>*)) {
+void run_benchmark_contiguous_store(const std::string name, void (*test)(array<int, i>*),
+                                    void (*gold)(array<int, i>*)) {
     typedef array<int, i> T;
 
     std::cout << name << ", " << i << ", ";
@@ -96,20 +97,33 @@ void run_benchmark_contiguous_store(const std::string name, void (*fn)(array<int
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
     for(int j = 0; j < iterations; j++) {
-        fn<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(r.data()));
+        test<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(r.data()));
     }
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time, start, stop);
     float gbs = (float)(sizeof(T) * (iterations * n_blocks * block_size)) / (time * 1000000);
-    std::cout << gbs << std::endl;
+    std::cout << gbs << ", ";
+    bool correct = true;
+    if (test != gold) {
+        thrust::device_vector<T> g(n);
+        gold<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(g.data()));
+        correct = thrust::equal(r.begin(), r.end(), g.begin());
+    }
+    if (correct)
+        std::cout << "Results passed";
+    else
+        std::cout << "INCORRECT";
+    std::cout << std::endl;
+    
 }
 
 template<int i>
 struct run_benchmark_contiguous_shfl_store {
     typedef array<int, i> T;
     static void impl() {
-        run_benchmark_contiguous_store("Contiguous SHFL Store", &benchmark_contiguous_shfl_store<T>);
+        run_benchmark_contiguous_store("Contiguous SHFL Store", &benchmark_contiguous_shfl_store<T>,
+                                       &benchmark_contiguous_direct_store<T>);
     }
 };
 
@@ -117,14 +131,16 @@ template<int i>
 struct run_benchmark_contiguous_direct_store {
     typedef array<int, i> T;
     static void impl() {
-        run_benchmark_contiguous_store("Contiguous Direct Store", &benchmark_contiguous_direct_store<T>);
+        run_benchmark_contiguous_store("Contiguous Direct Store", &benchmark_contiguous_direct_store<T>,
+                                       &benchmark_contiguous_direct_store<T>);
     }
 };
 
 
 
 template<int i>
-void run_benchmark_contiguous_load_store(const std::string name, void (*fn)(array<int, i>*, array<int, i>*)) {
+void run_benchmark_contiguous_load_store(const std::string name, void (*test)(array<int, i>*, array<int, i>*),
+                                         void (*gold)(array<int, i>*, array<int, i>*)) {
     typedef array<int, i> T;
 
     std::cout << name << ", " << i << ", ";
@@ -140,20 +156,33 @@ void run_benchmark_contiguous_load_store(const std::string name, void (*fn)(arra
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
     for(int j = 0; j < iterations; j++) {
-        fn<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(r.data()));
+        test<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(r.data()));
     }
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time, start, stop);
     float gbs = (float)(2 * sizeof(T) * (iterations * n_blocks * block_size)) / (time * 1000000);
-    std::cout << gbs << std::endl;
+    std::cout << gbs << ", ";
+    bool correct = true;
+    if (test != gold) {
+        thrust::device_vector<T> g(n);
+        gold<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(g.data()));
+        correct = thrust::equal(r.begin(), r.end(), g.begin());
+    }
+    if (correct)
+        std::cout << "Results passed";
+    else
+        std::cout << "INCORRECT";
+    std::cout << std::endl;
+            
+    
 }
 
 template<int i>
 struct run_benchmark_contiguous_shfl_load_store {
     typedef array<int, i> T;
     static void impl() {
-        run_benchmark_contiguous_load_store("Contiguous SHFL Load/Store", &benchmark_contiguous_shfl_load_store<T>);
+        run_benchmark_contiguous_load_store("Contiguous SHFL Load/Store", &benchmark_contiguous_shfl_load_store<T>, &benchmark_contiguous_direct_load_store<T>);
     }
 };
 
@@ -161,7 +190,7 @@ template<int i>
 struct run_benchmark_contiguous_direct_load_store {
     typedef array<int, i> T;
     static void impl() {
-        run_benchmark_contiguous_load_store("Contiguous Direct Load/Store", &benchmark_contiguous_direct_load_store<T>);
+        run_benchmark_contiguous_load_store("Contiguous Direct Load/Store", &benchmark_contiguous_direct_load_store<T>, &benchmark_contiguous_direct_load_store<T>);
     }
 };
 
@@ -183,7 +212,8 @@ thrust::device_vector<int> make_random_permutation(int s) {
 
 template<int i>
 void run_benchmark_random(const std::string name, const thrust::device_vector<int>& permutation,
-                          void (*fn)(const int*, array<int, i>*, array<int, i>*)) {
+                          void (*test)(const int*, array<int, i>*, array<int, i>*),
+                          void (*gold)(const int*, array<int, i>*, array<int, i>*)) {
     typedef array<int, i> T;
 
     std::cout << name << ", " << i << ", ";
@@ -199,7 +229,7 @@ void run_benchmark_random(const std::string name, const thrust::device_vector<in
     cudaEventCreate(&stop);
     cudaEventRecord(start, 0);
     for(int j = 0; j < iterations; j++) {
-        fn<<<n_blocks, block_size>>>(
+        test<<<n_blocks, block_size>>>(
             thrust::raw_pointer_cast(permutation.data()),
             thrust::raw_pointer_cast(s.data()),
             thrust::raw_pointer_cast(r.data()));
@@ -208,14 +238,26 @@ void run_benchmark_random(const std::string name, const thrust::device_vector<in
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time, start, stop);
     float gbs = (float)(sizeof(T) * (2 * iterations * n_blocks * block_size) + sizeof(int) * iterations * n_blocks * block_size) / (time * 1000000);
-    std::cout << gbs << std::endl;
+    std::cout << gbs << ", ";
+    bool correct = true;
+    if (test != gold) {
+        thrust::device_vector<T> g(n);
+        gold<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(permutation.data()),
+                                       thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(g.data()));
+        correct = thrust::equal(r.begin(), r.end(), g.begin());
+    }
+    if (correct)
+        std::cout << "Results passed";
+    else
+        std::cout << "INCORRECT";
+    std::cout << std::endl;
 }
 
 template<int i>
 struct run_benchmark_shfl_gather {
     typedef array<int, i> T;
     static void impl(const thrust::device_vector<int>& permutation) {
-        run_benchmark_random("SHFL Gather", permutation, &benchmark_shfl_gather<T>);
+        run_benchmark_random("SHFL Gather", permutation, &benchmark_shfl_gather<T>, &benchmark_direct_gather<T>);
     }
 };
 
@@ -223,7 +265,7 @@ template<int i>
 struct run_benchmark_direct_gather {
     typedef array<int, i> T;
     static void impl(const thrust::device_vector<int>& permutation) {
-        run_benchmark_random("Direct Gather", permutation, &benchmark_direct_gather<T>);
+        run_benchmark_random("Direct Gather", permutation, &benchmark_direct_gather<T>, &benchmark_direct_gather<T>);
     }
 };
 
@@ -231,14 +273,14 @@ template<int i>
 struct run_benchmark_shfl_scatter {
     typedef array<int, i> T;
     static void impl(const thrust::device_vector<int>& permutation) {
-        run_benchmark_random("SHFL Scatter", permutation, &benchmark_shfl_scatter<T>);
+        run_benchmark_random("SHFL Scatter", permutation, &benchmark_shfl_scatter<T>, &benchmark_direct_scatter<T>);
     }
 };
 template<int i>
 struct run_benchmark_direct_scatter {
     typedef array<int, i> T;
     static void impl(const thrust::device_vector<int>& permutation) {
-        run_benchmark_random("Direct Scatter", permutation, &benchmark_direct_scatter<T>);
+        run_benchmark_random("Direct Scatter", permutation, &benchmark_direct_scatter<T>, &benchmark_direct_scatter<T>);
     }
 };
 
@@ -262,7 +304,14 @@ struct do_tests<F, null_type> {
     static void impl(const T& t) {}
 };
 
-typedef static_range<2, 16> sizes;
+#ifndef LOWER_BOUND
+#define LOWER_BOUND 2
+#endif
+#ifndef UPPER_BOUND
+#define UPPER_BOUND 16
+#endif
+
+typedef static_range<LOWER_BOUND, UPPER_BOUND> sizes;
 
 int main() {
     do_tests<run_benchmark_contiguous_shfl_store, sizes>::impl();

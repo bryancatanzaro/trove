@@ -23,11 +23,11 @@ struct array {
         return *this;
     }
     __host__ __device__
-    bool operator==(const array& other) {
+    bool operator==(const array& other) const {
         return (head == other.head) && (tail == other.tail);
     }
     __host__ __device__
-    bool operator!=(const array& other) {
+    bool operator!=(const array& other) const {
         return !operator==(other);
     }
 };
@@ -50,11 +50,11 @@ struct array<T, 1> {
         return *this;
     }
     __host__ __device__
-    bool operator==(const array& other) {
+    bool operator==(const array& other) const {
         return (head == other.head);
     }
     __host__ __device__
-    bool operator!=(const array& other) {
+    bool operator!=(const array& other) const {
         return !operator==(other);
     }
 };
