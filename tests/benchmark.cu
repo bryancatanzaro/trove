@@ -21,7 +21,7 @@ __global__ void benchmark_contiguous_shfl_store(T* r) {
     int size = detail::size_in_ints<T>::value;
     data = counting_array<T>::impl(
         global_index * size);
-    store_aos_warp_contiguous(data, r, global_index);
+    store_aos(data, r, global_index);
 }
 
 template<typename T>
@@ -37,8 +37,8 @@ __global__ void benchmark_contiguous_direct_store(T* r) {
 template<typename T>
 __global__ void benchmark_contiguous_shfl_load_store(T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
-    T data = load_aos_warp_contiguous(s, global_index);
-    store_aos_warp_contiguous(data, r, global_index);
+    T data = load_aos(s, global_index);
+    store_aos(data, r, global_index);
 }
 
 template<typename T>
@@ -53,14 +53,14 @@ __global__ void benchmark_shfl_gather(const int* indices, T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
     T data = load_aos(s, index);
-    store_aos_warp_contiguous(data, r, global_index);
+    store_aos(data, r, global_index);
 }
 
 template<typename T>
 __global__ void benchmark_shfl_scatter(const int* indices, T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
-    T data = load_aos_warp_contiguous(s, global_index);
+    T data = load_aos(s, global_index);
     store_aos(data, r, index);
 }
 
