@@ -138,6 +138,14 @@ struct run_benchmark_contiguous_direct_store {
 
 
 
+template<typename T>
+void fill_test(thrust::device_vector<T>& d) {
+    thrust::device_ptr<int> p = thrust::device_ptr<int>((int*)thrust::raw_pointer_cast(d.data()));
+    thrust::counting_iterator<int> c(0);
+    int s = d.size() * sizeof(T) / sizeof(int);
+    thrust::copy(c, c+s, p);
+}
+
 template<int i>
 void run_benchmark_contiguous_load_store(const std::string name, void (*test)(array<int, i>*, array<int, i>*),
                                          void (*gold)(array<int, i>*, array<int, i>*)) {
@@ -148,6 +156,7 @@ void run_benchmark_contiguous_load_store(const std::string name, void (*test)(ar
     int block_size = 256;
     int n = n_blocks * block_size;
     thrust::device_vector<T> s(n);
+    fill_test(s);
     thrust::device_vector<T> r(n);
     int iterations = 10;
     cudaEvent_t start, stop;
@@ -169,6 +178,7 @@ void run_benchmark_contiguous_load_store(const std::string name, void (*test)(ar
         gold<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(g.data()));
         correct = thrust::equal(r.begin(), r.end(), g.begin());
     }
+    
     if (correct)
         std::cout << "Results passed";
     else
@@ -221,6 +231,7 @@ void run_benchmark_random(const std::string name, const thrust::device_vector<in
     int block_size = 256;
     int n = n_blocks * block_size;
     thrust::device_vector<T> s(n);
+    fill_test(s);
     thrust::device_vector<T> r(n);
     int iterations = 10;
     cudaEvent_t start, stop;
@@ -324,5 +335,6 @@ int main() {
     do_tests<run_benchmark_direct_scatter, sizes>::impl(permutation);
     do_tests<run_benchmark_shfl_gather, sizes>::impl(permutation);
     do_tests<run_benchmark_direct_gather, sizes>::impl(permutation);
+
 }
 
