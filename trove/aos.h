@@ -2,6 +2,7 @@
 #include <trove/memory.h>
 #include <trove/detail/dismember.h>
 #include <trove/transpose.h>
+#include <trove/utility.h>
 
 namespace trove {
 
@@ -101,10 +102,30 @@ bool is_contiguous(int warp_id, const I& idx) {
     return result;
 }
 
-}
+
+template<typename T>
+struct size_multiple_four {
+    static const bool value = (sizeof(T) & 0x3) == 0;
+};
+
+template<typename T>
+struct size_in_range {
+    static const bool value = (sizeof(T) >= 8) && (sizeof(T) <= 252);
+};
+
+template<typename T, bool s=size_multiple_four<T>::value, bool r=size_in_range<T>::value>
+struct use_shfl {
+    static const bool value = false;
+};
+
+template<typename T>
+struct use_shfl<T, true, true> {
+    static const bool value = true;
+};
 
 template<typename T, typename I>
-__device__ T load_aos(const T* src, const I& idx) {
+__device__ typename enable_if<use_shfl<T>::value, T>::type
+load_aos_dispatch(const T* src, const I& idx) {
     int warp_id = threadIdx.x & WARP_MASK;
     if (detail::is_contiguous(warp_id, idx)) {
         return detail::load_aos_warp_contiguous(src, idx);
@@ -114,12 +135,23 @@ __device__ T load_aos(const T* src, const I& idx) {
             detail::indexed_load<detail::size_in_ints<T>::value,
                                  T, I>::impl(src, idx, warp_id);
         r2c_warp_transpose(loaded);
-        return detail::fuse<T>(loaded);
-    }
+        if (idx >= 0) return detail::fuse<T>(loaded);
+        else return T();
+    }   
 }
 
 template<typename T, typename I>
-__device__ void store_aos(const T& data, T* dest, const I& idx) {
+__device__ typename enable_if<!use_shfl<T>::value, T>::type
+load_aos_dispatch(const T* src, const I& idx) {
+    if (idx >= 0)
+        return src[idx];
+    else
+        return T();
+}
+
+template<typename T, typename I>
+__device__ typename enable_if<use_shfl<T>::value>::type
+store_aos_dispatch(const T& data, T* dest, const I& idx) {
     int warp_id = threadIdx.x & WARP_MASK;
     if (detail::is_contiguous(warp_id, idx)) {
         detail::store_aos_warp_contiguous(data, dest, idx);
@@ -130,6 +162,25 @@ __device__ void store_aos(const T& data, T* dest, const I& idx) {
         detail::indexed_store<detail::size_in_ints<T>::value,
                               T, I>::impl(lysed, dest, idx, warp_id);
     }
+}
+
+template<typename T, typename I>
+__device__ typename enable_if<!use_shfl<T>::value>::type
+store_aos_dispatch(const T& data, T* dest, const I& idx) {
+    if (idx >= 0) dest[idx] = data;
+}
+
+
+}
+
+template<typename T, typename I>
+__device__ T load_aos(const T* src, const I& idx) {
+    return detail::load_aos_dispatch(src, idx);
+}
+
+template<typename T, typename I>
+__device__ void store_aos(const T& data, T* dest, const I& idx) {
+    detail::store_aos_dispatch(data, dest, idx);
 }
 
 }

@@ -316,7 +316,7 @@ struct do_tests<F, null_type> {
 };
 
 #ifndef LOWER_BOUND
-#define LOWER_BOUND 2
+#define LOWER_BOUND 1
 #endif
 #ifndef UPPER_BOUND
 #define UPPER_BOUND 16

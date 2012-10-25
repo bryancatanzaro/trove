@@ -19,7 +19,7 @@ struct counting_array<array<T, s> > {
 template<typename T>
 struct counting_array<array<T, 1> > {
     __host__ __device__
-    static array<T, 1> impl(T v, T) {
+    static array<T, 1> impl(T v, T i=1) {
         return make_array(v);
     }
 };
@@ -91,6 +91,14 @@ struct static_range<f, f> {
     static const int head = f;
     typedef null_type tail;
 };
+
+template<bool b, typename T=void>
+struct enable_if {
+    typedef T type;
+};
+
+template<typename T>
+struct enable_if<false, T> {};
 
 
 }

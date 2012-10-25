@@ -1,5 +1,5 @@
 ARCH ?= sm_35
-LOWER_BOUND ?= 2
+LOWER_BOUND ?= 1
 UPPER_BOUND ?= 16
 all: test_transpose test_aos benchmark
 
