@@ -4,15 +4,17 @@
 #include <trove/transpose.h>
 #include <trove/utility.h>
 
+//#define WARP_CONVERGED ((1LL << WARP_SIZE) - 1)
+#define WARP_CONVERGED 0xffffffff
+
 namespace trove {
 
 namespace detail {
 
-template<typename T, typename I>
-__device__ T load_aos_warp_contiguous(const T* src, const I& idx) {
+template<typename T>
+__device__ T load_warp_contiguous(const T* src) {
     int warp_id = threadIdx.x & WARP_MASK;
-    I warp_begin_idx = idx - warp_id;
-    const T* warp_begin_src = src + warp_begin_idx;
+    const T* warp_begin_src = src - warp_id;
     const int* as_int_src = (const int*)warp_begin_src;
     typedef array<int, detail::size_in_ints<T>::value> int_store;
     int_store loaded = warp_load<int_store>(as_int_src, warp_id);
@@ -20,84 +22,77 @@ __device__ T load_aos_warp_contiguous(const T* src, const I& idx) {
     return detail::fuse<T>(loaded);
 }
 
-template<typename T, typename I>
-__device__ void store_aos_warp_contiguous(const T& data, T* dest, const I& idx) {
+template<typename T>
+__device__ void store_warp_contiguous(const T& data, T* dest) {
     int warp_id = threadIdx.x & WARP_MASK;
-    I warp_begin_idx = idx - warp_id;
-    T* warp_begin_dest = dest + warp_begin_idx;
+    T* warp_begin_dest = dest - warp_id;
     int* as_int_dest = (int*)warp_begin_dest;
     typedef array<int, detail::size_in_ints<T>::value> int_store;
     int_store lysed = detail::lyse(data);
     c2r_warp_transpose(lysed);
     warp_store(lysed, as_int_dest, warp_id);
-    
 }
 
-template<typename T, typename I>
-__device__ int* compute_address(T* src, const I& src_index, int impl_index) {
+template<typename T>
+__device__ int* compute_address(T* src, int impl_index) {
     int shuffle_index = impl_index / size_in_ints<T>::value;
     int sub_index = impl_index % size_in_ints<T>::value;
-    I base_index = __shfl(src_index, shuffle_index);
-    int* result = (base_index < 0) ? NULL :
-                   ((int*)(src + base_index) + sub_index);
+    T* base_ptr = __shfl(src, shuffle_index);
+    int* result = ((int*)(base_ptr) + sub_index);
     return result;
 }
         
-template<int s, typename T, typename I>
+template<int s, typename T>
 struct indexed_load {
     __device__
-    static array<int, s> impl(const T* src,
-                              const I& src_index, int impl_index) {
+    static array<int, s> impl(const T* src, int impl_index) {
         int result;
-        int* address = compute_address(src, src_index, impl_index);
-        if (address != NULL) result = *address;
+        int* address = compute_address(src, impl_index);
+        result = *address;
         return array<int, s>(
             result,
-            indexed_load<s-1, T, I>::impl(src, src_index,
-                                          impl_index + WARP_SIZE));
+            indexed_load<s-1, T>::impl(src, impl_index + WARP_SIZE));
     }
 };
 
-template<typename T, typename I>
-struct indexed_load<1, T, I> {
+template<typename T>
+struct indexed_load<1, T> {
     __device__
-    static array<int, 1> impl(const T* src,
-                              const I& src_index, int impl_index) {
+    static array<int, 1> impl(const T* src, int impl_index) {
         int result;
-        int* address = compute_address(src, src_index, impl_index);
-        if (address != NULL) result = *address;
+        int* address = compute_address(src, impl_index);
+        result = *address;
         return array<int, 1>(result);
     }
 };
 
-template<int s, typename T, typename I>
+template<int s, typename T>
 struct indexed_store {
     __device__
     static void impl(const array<int, s>& src,
-                     T* dest, const I& dest_index, int impl_index) {
-        int* address = compute_address(dest, dest_index, impl_index);
-        if (address != NULL) *address = src.head;
-        indexed_store<s-1, T, I>::impl(src.tail, dest, dest_index,
-                                       impl_index + WARP_SIZE);
+                     T* dest, int impl_index) {
+        int* address = compute_address(dest, impl_index);
+        *address = src.head;
+        indexed_store<s-1, T>::impl(src.tail, dest, impl_index + WARP_SIZE);
     }
 };
 
-template<typename T, typename I>
-struct indexed_store<1, T, I> {
+template<typename T>
+struct indexed_store<1, T> {
     __device__
     static void impl(const array<int, 1>& src,
-                     T* dest, const I& dest_index, int impl_index) {
-        int* address = compute_address(dest, dest_index, impl_index);
-        if (address != NULL) *address = src.head;
+                     T* dest, int impl_index) {
+        int* address = compute_address(dest, impl_index);
+        *address = src.head;
     }
 };
 
-template<typename I>
+template<typename T>
 __device__
-bool is_contiguous(int warp_id, const I& idx) {
+bool is_contiguous(int warp_id, const T* ptr) {
     int neighbor_idx = (warp_id == 0) ? 0 : warp_id-1;
-    I neighbor = __shfl(idx, neighbor_idx);
-    bool neighbor_contiguous = (warp_id == 0) ? idx > 0 : (idx - neighbor == 1);
+    const T* neighbor_ptr = __shfl(ptr, neighbor_idx);
+    bool neighbor_contiguous = (warp_id == 0) ? true : (ptr - neighbor_ptr == sizeof(T));
     bool result = __all(neighbor_contiguous);
     return result;
 }
@@ -123,64 +118,72 @@ struct use_shfl<T, true, true> {
     static const bool value = true;
 };
 
-template<typename T, typename I>
+template<typename T>
 __device__ typename enable_if<use_shfl<T>::value, T>::type
-load_aos_dispatch(const T* src, const I& idx) {
+load_dispatch(const T* src) {
     int warp_id = threadIdx.x & WARP_MASK;
-    if (detail::is_contiguous(warp_id, idx)) {
-        return detail::load_aos_warp_contiguous(src, idx);
+    if (detail::is_contiguous(warp_id, src)) {
+        return detail::load_warp_contiguous(src);
     } else {
         typedef array<int, detail::size_in_ints<T>::value> int_store;
         int_store loaded =
-            detail::indexed_load<detail::size_in_ints<T>::value,
-                                 T, I>::impl(src, idx, warp_id);
+            detail::indexed_load<detail::size_in_ints<T>::value, T>::impl(
+                src, warp_id);
         r2c_warp_transpose(loaded);
-        if (idx >= 0) return detail::fuse<T>(loaded);
-        else return T();
+        return detail::fuse<T>(loaded);
     }   
 }
 
-template<typename T, typename I>
+template<typename T>
 __device__ typename enable_if<!use_shfl<T>::value, T>::type
-load_aos_dispatch(const T* src, const I& idx) {
-    if (idx >= 0)
-        return src[idx];
-    else
-        return T();
+load_dispatch(const T* src) {
+    return *src;
 }
 
-template<typename T, typename I>
+template<typename T>
 __device__ typename enable_if<use_shfl<T>::value>::type
-store_aos_dispatch(const T& data, T* dest, const I& idx) {
+store_dispatch(const T& data, T* dest) {
     int warp_id = threadIdx.x & WARP_MASK;
-    if (detail::is_contiguous(warp_id, idx)) {
-        detail::store_aos_warp_contiguous(data, dest, idx);
+    if (detail::is_contiguous(warp_id, dest)) {
+        detail::store_warp_contiguous(data, dest);
     } else {
         typedef array<int, detail::size_in_ints<T>::value> int_store;
         int_store lysed = detail::lyse(data);
         c2r_warp_transpose(lysed);
-        detail::indexed_store<detail::size_in_ints<T>::value,
-                              T, I>::impl(lysed, dest, idx, warp_id);
+        detail::indexed_store<detail::size_in_ints<T>::value, T>::impl(
+            lysed, dest, warp_id);
     }
 }
 
-template<typename T, typename I>
+template<typename T>
 __device__ typename enable_if<!use_shfl<T>::value>::type
-store_aos_dispatch(const T& data, T* dest, const I& idx) {
-    if (idx >= 0) dest[idx] = data;
+store_dispatch(const T& data, T* dest) {
+    *dest = data;
 }
 
-
+__device__
+bool is_converged() {
+    return (__ballot(true) == WARP_CONVERGED);
+}
+    
 }
 
-template<typename T, typename I>
-__device__ T load_aos(const T* src, const I& idx) {
-    return detail::load_aos_dispatch(src, idx);
+template<typename T>
+__device__ T load(const T* src) {
+    if (detail::is_converged()) {
+        return detail::load_dispatch(src);
+    } else {
+        return *src;
+    }
 }
 
-template<typename T, typename I>
-__device__ void store_aos(const T& data, T* dest, const I& idx) {
-    detail::store_aos_dispatch(data, dest, idx);
+template<typename T>
+__device__ void store(const T& data, T* dest) {
+    if (detail::is_converged()) {
+        detail::store_dispatch(data, dest);
+    } else {
+        *dest = data;
+    }
 }
 
 }

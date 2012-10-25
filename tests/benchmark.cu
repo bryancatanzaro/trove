@@ -21,7 +21,7 @@ __global__ void benchmark_contiguous_shfl_store(T* r) {
     int size = detail::size_in_ints<T>::value;
     data = counting_array<T>::impl(
         global_index * size);
-    store_aos(data, r, global_index);
+    store(data, r + global_index);
 }
 
 template<typename T>
@@ -37,8 +37,8 @@ __global__ void benchmark_contiguous_direct_store(T* r) {
 template<typename T>
 __global__ void benchmark_contiguous_shfl_load_store(T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
-    T data = load_aos(s, global_index);
-    store_aos(data, r, global_index);
+    T data = load(s + global_index);
+    store(data, r + global_index);
 }
 
 template<typename T>
@@ -52,16 +52,16 @@ template<typename T>
 __global__ void benchmark_shfl_gather(const int* indices, T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
-    T data = load_aos(s, index);
-    store_aos(data, r, global_index);
+    T data = load(s + index);
+    store(data, r + global_index);
 }
 
 template<typename T>
 __global__ void benchmark_shfl_scatter(const int* indices, T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
-    T data = load_aos(s, global_index);
-    store_aos(data, r, index);
+    T data = load(s + global_index);
+    store(data, r + index);
 }
 
 template<typename T>
@@ -88,7 +88,7 @@ void run_benchmark_contiguous_store(const std::string name, void (*test)(array<i
     std::cout << name << ", " << i << ", ";
     int n_blocks = 15 * 8 * 100;
     int block_size = 256;
-    int n = n_blocks * block_size;
+    int n = n_blocks * block_size - 100;
     thrust::device_vector<T> r(n);
     int iterations = 10;
     cudaEvent_t start, stop;
