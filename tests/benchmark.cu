@@ -4,24 +4,24 @@
 #include <thrust/generate.h>
 #include <thrust/sort.h>
 #include <cstdlib>
-#include <trove/transpose.h>
-#include <trove/aos.h>
-#include <trove/print_array.h>
 
 #include <thrust/device_vector.h>
 #include <thrust/equal.h>
 
 
+#include <trove/ptr.h>
+
 using namespace trove;
 
 template<typename T>
-__global__ void benchmark_contiguous_shfl_store(T* r) {
+__global__ void benchmark_contiguous_shfl_store(T* raw_r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     T data;
     int size = detail::size_in_ints<T>::value;
     data = counting_array<T>::impl(
         global_index * size);
-    store(data, r + global_index);
+    trove::coalesced_ptr<T> r(raw_r);
+    r[global_index] = data;
 }
 
 template<typename T>
@@ -35,10 +35,12 @@ __global__ void benchmark_contiguous_direct_store(T* r) {
 }
 
 template<typename T>
-__global__ void benchmark_contiguous_shfl_load_store(T* s, T* r) {
+__global__ void benchmark_contiguous_shfl_load_store(T* raw_s, T* raw_r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
-    T data = load(s + global_index);
-    store(data, r + global_index);
+    trove::coalesced_ptr<T> s(raw_s);
+    trove::coalesced_ptr<T> r(raw_r);
+    T data = s[global_index];
+    r[global_index] = data;
 }
 
 template<typename T>
@@ -49,19 +51,23 @@ __global__ void benchmark_contiguous_direct_load_store(T* s, T* r) {
 }
 
 template<typename T>
-__global__ void benchmark_shfl_gather(const int* indices, T* s, T* r) {
+__global__ void benchmark_shfl_gather(const int* indices, T* raw_s, T* raw_r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
-    T data = load(s + index);
-    store(data, r + global_index);
+    trove::coalesced_ptr<T> s(raw_s);
+    trove::coalesced_ptr<T> r(raw_r);
+    T data = s[index];
+    r[global_index] = data;
 }
 
 template<typename T>
-__global__ void benchmark_shfl_scatter(const int* indices, T* s, T* r) {
+__global__ void benchmark_shfl_scatter(const int* indices, T* raw_s, T* raw_r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
-    T data = load(s + global_index);
-    store(data, r + index);
+    trove::coalesced_ptr<T> s(raw_s);
+    trove::coalesced_ptr<T> r(raw_r);
+    T data = s[global_index];
+    r[index] = data;
 }
 
 template<typename T>

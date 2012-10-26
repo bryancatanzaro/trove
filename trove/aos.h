@@ -1,5 +1,4 @@
 #pragma once
-#include <trove/memory.h>
 #include <trove/detail/dismember.h>
 #include <trove/transpose.h>
 #include <trove/utility.h>
@@ -10,28 +9,6 @@
 namespace trove {
 
 namespace detail {
-
-template<typename T>
-__device__ T load_warp_contiguous(const T* src) {
-    int warp_id = threadIdx.x & WARP_MASK;
-    const T* warp_begin_src = src - warp_id;
-    const int* as_int_src = (const int*)warp_begin_src;
-    typedef array<int, detail::size_in_ints<T>::value> int_store;
-    int_store loaded = warp_load<int_store>(as_int_src, warp_id);
-    r2c_warp_transpose(loaded);
-    return detail::fuse<T>(loaded);
-}
-
-template<typename T>
-__device__ void store_warp_contiguous(const T& data, T* dest) {
-    int warp_id = threadIdx.x & WARP_MASK;
-    T* warp_begin_dest = dest - warp_id;
-    int* as_int_dest = (int*)warp_begin_dest;
-    typedef array<int, detail::size_in_ints<T>::value> int_store;
-    int_store lysed = detail::lyse(data);
-    c2r_warp_transpose(lysed);
-    warp_store(lysed, as_int_dest, warp_id);
-}
 
 template<typename T>
 __device__ int* compute_address(T* src, int impl_index) {
@@ -122,16 +99,16 @@ template<typename T>
 __device__ typename enable_if<use_shfl<T>::value, T>::type
 load_dispatch(const T* src) {
     int warp_id = threadIdx.x & WARP_MASK;
-    if (detail::is_contiguous(warp_id, src)) {
-        return detail::load_warp_contiguous(src);
-    } else {
+    // if (detail::is_contiguous(warp_id, src)) {
+    //     return detail::load_warp_contiguous(src);
+    // } else {
         typedef array<int, detail::size_in_ints<T>::value> int_store;
         int_store loaded =
             detail::indexed_load<detail::size_in_ints<T>::value, T>::impl(
                 src, warp_id);
         r2c_warp_transpose(loaded);
         return detail::fuse<T>(loaded);
-    }   
+    // }   
 }
 
 template<typename T>
@@ -144,15 +121,15 @@ template<typename T>
 __device__ typename enable_if<use_shfl<T>::value>::type
 store_dispatch(const T& data, T* dest) {
     int warp_id = threadIdx.x & WARP_MASK;
-    if (detail::is_contiguous(warp_id, dest)) {
-        detail::store_warp_contiguous(data, dest);
-    } else {
+    // if (detail::is_contiguous(warp_id, dest)) {
+    //     detail::store_warp_contiguous(data, dest);
+    // } else {
         typedef array<int, detail::size_in_ints<T>::value> int_store;
         int_store lysed = detail::lyse(data);
         c2r_warp_transpose(lysed);
         detail::indexed_store<detail::size_in_ints<T>::value, T>::impl(
             lysed, dest, warp_id);
-    }
+    // }
 }
 
 template<typename T>
