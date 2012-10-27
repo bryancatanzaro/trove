@@ -34,26 +34,46 @@ namespace detail {
 
 template<typename T>
 __device__ typename detail::dismember_type<T>::type*
-compute_address(T* src, int impl_index) {
+compute_address(T* src, int div, int mod) {
     typedef typename detail::dismember_type<T>::type U;
-    int shuffle_index = impl_index / aliased_size<T, U>::value;
-    int sub_index = impl_index % aliased_size<T, U>::value;
-    T* base_ptr = __shfl(src, shuffle_index);
-    U* result = ((U*)(base_ptr) + sub_index);
+    T* base_ptr = __shfl(src, div);
+    U* result = ((U*)(base_ptr) + mod);
     return result;
 }
+
+template<typename T>
+struct address_constants {
+    typedef typename detail::dismember_type<T>::type U;
+    static const int m = aliased_size<T, U>::value;
+    static const int mod_offset = WARP_SIZE % m;
+    static const int div_offset = WARP_SIZE / m;
+};
+
+template<typename T>
+__device__ void update_indices(int& div, int& mod) {
+    mod += address_constants<T>::mod_offset;
+    if (mod >= address_constants<T>::m) {
+        mod -= address_constants<T>::m;
+        div += 1;
+    }
+    div += address_constants<T>::div_offset;
+}
         
+
 template<int s, typename T>
 struct indexed_load {
     typedef typename detail::dismember_type<T>::type U;
     __device__
-    static array<U, s> impl(const T* src, int impl_index) {
+    static array<U, s> impl(const T* src, int div, int mod) {
         U result;
-        U* address = compute_address(src, impl_index);
+        U* address = compute_address(src, div, mod);
         result = *address;
+        update_indices<T>(div, mod);
+        
+        
         return array<U, s>(
             result,
-            indexed_load<s-1, T>::impl(src, impl_index + WARP_SIZE));
+            indexed_load<s-1, T>::impl(src, div, mod));
     }
 };
 
@@ -61,9 +81,9 @@ template<typename T>
 struct indexed_load<1, T> {
     typedef typename detail::dismember_type<T>::type U;
     __device__
-    static array<U, 1> impl(const T* src, int impl_index) {
+    static array<U, 1> impl(const T* src, int div, int mod) {
         U result;
-        U* address = compute_address(src, impl_index);
+        U* address = compute_address(src, div, mod);
         result = *address;
         return array<U, 1>(result);
     }
@@ -74,10 +94,11 @@ struct indexed_store {
     typedef typename detail::dismember_type<T>::type U;
     __device__
     static void impl(const array<U, s>& src,
-                     T* dest, int impl_index) {
-        U* address = compute_address(dest, impl_index);
+                     T* dest, int div, int mod) {
+        U* address = compute_address(dest, div, mod);
         *address = src.head;
-        indexed_store<s-1, T>::impl(src.tail, dest, impl_index + WARP_SIZE);
+        update_indices<T>(div, mod);
+        indexed_store<s-1, T>::impl(src.tail, dest, div, mod);
     }
 };
 
@@ -86,8 +107,8 @@ struct indexed_store<1, T> {
     typedef typename detail::dismember_type<T>::type U;
     __device__
     static void impl(const array<U, 1>& src,
-                     T* dest, int impl_index) {
-        U* address = compute_address(dest, impl_index);
+                     T* dest, int div, int mod) {
+        U* address = compute_address(dest, div, mod);
         *address = src.head;
     }
 };
@@ -152,7 +173,9 @@ load_dispatch(const T* src) {
     typedef array<U, detail::aliased_size<T, U>::value> u_store;
     u_store loaded =
         detail::indexed_load<detail::aliased_size<T, U>::value, T>::impl(
-            src, warp_id);
+            src,
+            warp_id / address_constants<T>::m,
+            warp_id % address_constants<T>::m);
     r2c_warp_transpose(loaded);
     return detail::fuse<T>(loaded);
     // }   
@@ -185,7 +208,9 @@ store_dispatch(const T& data, T* dest) {
     u_store lysed = detail::lyse<U>(data);
     c2r_warp_transpose(lysed);
     detail::indexed_store<detail::aliased_size<T, U>::value, T>::impl(
-        lysed, dest, warp_id);
+        lysed, dest,
+        warp_id / address_constants<T>::m,
+        warp_id % address_constants<T>::m);
     // }
 }
 
