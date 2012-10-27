@@ -100,5 +100,10 @@ struct enable_if {
 template<typename T>
 struct enable_if<false, T> {};
 
+template<typename T, int p>
+struct size_multiple_power_of_two {
+    static const bool value = (sizeof(T) & ((1 << p) - 1)) == 0;
+};
+
 
 }

@@ -21,7 +21,7 @@ struct coalesced_ref {
 template<typename T>
 struct coalesced_ptr {
     T* m_ptr;
-    __device__ coalesced_ptr(T* ptr) : m_ptr(ptr) {}
+    __host__ __device__ coalesced_ptr(T* ptr) : m_ptr(ptr) {}
     __device__ trove::detail::coalesced_ref<T> operator*() {
         return trove::detail::coalesced_ref<T>(m_ptr);
     }

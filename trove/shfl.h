@@ -30,8 +30,9 @@ template<typename T>
 __device__
 T __shfl(const T& t, const int& i) {
     typedef trove::array<int,
-                         trove::detail::size_in_ints<T>::value> lysed_array;
-    lysed_array lysed = trove::detail::lyse(t);
+                         trove::detail::aliased_size<T, int>::value>
+        lysed_array;
+    lysed_array lysed = trove::detail::lyse<int>(t);
     trove::detail::shuffle<lysed_array::size>
       ::impl(lysed, i);
     return trove::detail::fuse<T>(lysed);

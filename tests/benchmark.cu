@@ -14,10 +14,12 @@
 using namespace trove;
 
 template<typename T>
-__global__ void benchmark_contiguous_shfl_store(T* raw_r) {
+__global__ void
+// __launch_bounds__(256, 8)
+    benchmark_contiguous_shfl_store(T* raw_r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     T data;
-    int size = detail::size_in_ints<T>::value;
+    int size = detail::aliased_size<T, int>::value;
     data = counting_array<T>::impl(
         global_index * size);
     trove::coalesced_ptr<T> r(raw_r);
@@ -25,17 +27,21 @@ __global__ void benchmark_contiguous_shfl_store(T* raw_r) {
 }
 
 template<typename T>
-__global__ void benchmark_contiguous_direct_store(T* r) {
+__global__ void
+// __launch_bounds__(256, 8)
+    benchmark_contiguous_direct_store(T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     T data;
-    int size = detail::size_in_ints<T>::value;
+    int size = detail::aliased_size<T, int>::value;
     data = counting_array<T>::impl(
         global_index * size);
     r[global_index] = data;
 }
 
 template<typename T>
-__global__ void benchmark_contiguous_shfl_load_store(T* raw_s, T* raw_r) {
+__global__ void
+// __launch_bounds__(256, 8)
+    benchmark_contiguous_shfl_load_store(T* raw_s, T* raw_r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     trove::coalesced_ptr<T> s(raw_s);
     trove::coalesced_ptr<T> r(raw_r);
@@ -44,14 +50,18 @@ __global__ void benchmark_contiguous_shfl_load_store(T* raw_s, T* raw_r) {
 }
 
 template<typename T>
-__global__ void benchmark_contiguous_direct_load_store(T* s, T* r) {
+__global__ void
+// __launch_bounds__(256, 8)
+    benchmark_contiguous_direct_load_store(T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     T data = s[global_index];
     r[global_index] = data;
 }
 
 template<typename T>
-__global__ void benchmark_shfl_gather(const int* indices, T* raw_s, T* raw_r) {
+__global__ void
+// __launch_bounds__(256, 8)
+    benchmark_shfl_gather(const int* indices, T* raw_s, T* raw_r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
     trove::coalesced_ptr<T> s(raw_s);
@@ -61,7 +71,9 @@ __global__ void benchmark_shfl_gather(const int* indices, T* raw_s, T* raw_r) {
 }
 
 template<typename T>
-__global__ void benchmark_shfl_scatter(const int* indices, T* raw_s, T* raw_r) {
+__global__ void
+// __launch_bounds__(256, 8)
+    benchmark_shfl_scatter(const int* indices, T* raw_s, T* raw_r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
     trove::coalesced_ptr<T> s(raw_s);
@@ -71,7 +83,9 @@ __global__ void benchmark_shfl_scatter(const int* indices, T* raw_s, T* raw_r) {
 }
 
 template<typename T>
-__global__ void benchmark_direct_gather(const int* indices, T* s, T* r) {
+__global__ void
+// __launch_bounds__(256, 8)
+    benchmark_direct_gather(const int* indices, T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
     T data = s[index];
@@ -79,7 +93,9 @@ __global__ void benchmark_direct_gather(const int* indices, T* s, T* r) {
 }
 
 template<typename T>
-__global__ void benchmark_direct_scatter(const int* indices, T* s, T* r) {
+__global__ void
+// __launch_bounds__(256, 8)
+    benchmark_direct_scatter(const int* indices, T* s, T* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     int index = indices[global_index];
     T data = s[global_index];
