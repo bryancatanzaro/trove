@@ -11,3 +11,12 @@ test_aos: test_aos.cu
 
 benchmark: benchmark.cu
 	nvcc -arch=$(ARCH) -I../ -Xptxas -v benchmark.cu -o benchmark -DLOWER_BOUND=$(LOWER_BOUND) -DUPPER_BOUND=$(UPPER_BOUND)
+
+reduce: reduce.cu
+	nvcc -arch=$(ARCH) -I../ -Xptxas -v reduce.cu -o reduce
+
+construct: construct.cu
+	nvcc -arch=$(ARCH) -I../ -Xptxas -v construct.cu -o construct
+
+transform: transform.cu
+	nvcc -arch=$(ARCH) -I../ -Xptxas -v transform.cu -o transform
