@@ -168,9 +168,9 @@ template<typename T>
 __device__ typename enable_if<use_shfl<T>::value, T>::type
 load_dispatch(const T* src) {
     int warp_id = threadIdx.x & WARP_MASK;
-    if (detail::is_contiguous(warp_id, src)) {
-        return detail::load_warp_contiguous(src);
-    } else {
+    // if (detail::is_contiguous(warp_id, src)) {
+    //     return detail::load_warp_contiguous(src);
+    // } else {
         typedef typename detail::dismember_type<T>::type U;
         typedef array<U, detail::aliased_size<T, U>::value> u_store;
         u_store loaded =
@@ -180,7 +180,7 @@ load_dispatch(const T* src) {
                 warp_id % address_constants<T>::m);
         r2c_warp_transpose(loaded);
         return detail::fuse<T>(loaded);
-    }   
+    // }   
 }
 
 template<typename T>
@@ -202,9 +202,9 @@ template<typename T>
 __device__ typename enable_if<use_shfl<T>::value>::type
 store_dispatch(const T& data, T* dest) {
     int warp_id = threadIdx.x & WARP_MASK;
-    if (detail::is_contiguous(warp_id, dest)) {
-        detail::store_warp_contiguous(data, dest);
-    } else {
+    // if (detail::is_contiguous(warp_id, dest)) {
+    //     detail::store_warp_contiguous(data, dest);
+    // } else {
         typedef typename detail::dismember_type<T>::type U;
         typedef array<U, detail::aliased_size<T, U>::value> u_store;
         u_store lysed = detail::lyse<U>(data);
@@ -213,7 +213,7 @@ store_dispatch(const T& data, T* dest) {
             lysed, dest,
             warp_id / address_constants<T>::m,
             warp_id % address_constants<T>::m);
-    }
+    // }
 }
 
 template<typename T>

@@ -20,3 +20,6 @@ construct: construct.cu
 
 transform: transform.cu
 	nvcc -arch=$(ARCH) -I../ -Xptxas -v transform.cu -o transform
+
+copy: copy.cu
+	nvcc -arch=$(ARCH) -I../ -Xptxas -v copy.cu -o copy
