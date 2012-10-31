@@ -63,13 +63,6 @@ __global__ void
     
     for(int index = global_index; index < len; index += grid_size) {
         output[index] = f(input[index]);
-        index += grid_size;
-        output[index] = f(input[index]);
-        index += grid_size;
-        output[index] = f(input[index]);
-        index += grid_size;
-        output[index] = f(input[index]);
-
     }
 }
 
@@ -89,7 +82,7 @@ thrust::device_vector<A> make_filled(int n) {
 int main() {
     typedef double T;
     typedef trove::array<T, 3> n_array;
-    int n = 4 * 100 * 8 * 256 * 15;
+    int n = 100 * 8 * 256 * 15;
     thrust::device_vector<n_array> c = make_filled<n_array>(n);
     trove::coalesced_ptr<n_array> c_c(thrust::raw_pointer_cast(c.data()));
     thrust::device_vector<T> r(n);
