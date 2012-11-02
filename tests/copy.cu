@@ -1,24 +1,11 @@
 #include <stdio.h>
 #include <trove/ptr.h>
-
-template<typename P>
-struct value_type{};
-
-template<typename P>
-struct value_type<P*> {
-    typedef P type;
-};
-
-template<typename P>
-struct value_type<trove::coalesced_ptr<P> > {
-    typedef P type;
-};
+#include "timer.h"
 
 template<
     typename InputIterator,
     typename OutputIterator>
 __global__ void
-//__launch_bounds__(256, 8)
     copy(InputIterator input,
          OutputIterator output,
          int len) {
@@ -44,14 +31,13 @@ thrust::device_vector<A> make_filled(int n) {
 }
 
 int main() {
-    // typedef float T;
-    // typedef trove::array<T, 6> n_array;
     typedef double T;
-    typedef trove::array<T, 3> n_array;
+    typedef trove::array<T, 5> n_array;
 
-    int n = 4 * 100 * 8 * 256 * 15;
+    int n = 100 * 8 * 256 * 15;
     thrust::device_vector<n_array> c = make_filled<n_array>(n);
-    trove::coalesced_ptr<n_array> c_c(thrust::raw_pointer_cast(c.data()));
+    n_array* p_c(thrust::raw_pointer_cast(c.data()));
+    trove::coalesced_ptr<n_array> c_c(p_c);
     thrust::device_vector<n_array> r(n);
     n_array* p_r = thrust::raw_pointer_cast(r.data());
     trove::coalesced_ptr<n_array> c_r(p_r);
@@ -60,38 +46,27 @@ int main() {
    
     int nthreads = 256;
     int nblocks = min(15 * 8, n/nthreads);
-    //int nblocks = n/nthreads;
 
     
     int iterations = 10;
-    cudaEvent_t start, stop;
-    float time = 0;
+    
     std::cout << "Coalesced ";
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    cuda_timer timer;
+    timer.start();
     for(int j = 0; j < iterations; j++) {
         copy<<<nblocks, nthreads>>>(c_c, c_r, n);
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
+    float time = timer.stop();
     float gbs = (float)(sizeof(n_array) * (iterations * (2 * n))) / (time * 1000000);
     std::cout << gbs << std::endl;
 
-    
-    n_array* p_c(thrust::raw_pointer_cast(c.data()));
-
     std::cout << "Direct ";
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    timer.start();
     for(int j = 0; j < iterations; j++) {
         copy<<<nblocks, nthreads>>>(p_c, p_r, n);
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
+    time = timer.stop();
+    
     gbs = (float)(sizeof(n_array) * (iterations * (2 * n))) / (time * 1000000);
     std::cout << gbs << std::endl;
 

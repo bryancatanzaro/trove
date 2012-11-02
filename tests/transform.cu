@@ -1,5 +1,6 @@
-#include <stdio.h>
+#include <iostream>
 #include <trove/ptr.h>
+#include "timer.h"
 
 template<typename P>
 struct value_type{};
@@ -14,37 +15,28 @@ struct value_type<trove::coalesced_ptr<P> > {
     typedef P type;
 };
 
-
 template<typename A>
-struct euclidean_distance {
-    static const int i = A::size;
+struct update {
     typedef typename A::value_type T;
-    typedef A input_type;
-    typedef T result_type;
+    typedef A result_type;
     
-    input_type m_point;
-    __host__ __device__ euclidean_distance(const input_type& point) : m_point(point) {}
+    T m_value;
+    __host__ __device__ update(const T& value) : m_value(value) {}
 
-    template<int j>
     __device__
-    static T diff2(const T& t, const T& p) {
-        T diff = t - p;
-        return diff * diff;
-    }
-    
-    __device__
-    static T impl(const trove::array<T, 1>& a, const trove::array<T, 1>& p) {
-        return diff2<i-1>(a.head, p.head);
+    static trove::array<T, 1> impl(const trove::array<T, 1>& a, const T& value) {
+        return trove::array<T, 1>(trove::get<0>(a) + value);
     }
 
     template<int j>
     __device__
-    static T impl(const trove::array<T, j>& a, const trove::array<T, j>& p) {
-        return diff2<i-j>(a.head, p.head) + impl(a.tail, p.tail);
+    static trove::array<T, j> impl(const trove::array<T, j>& a, const T& value) {
+        return trove::array<T, j>(trove::get<0>(a) + value,
+                                  impl(a.tail, value));
     }
 
-    __device__ T operator()(const input_type& o) {
-        return impl(o, m_point);
+    __device__ A operator()(const A& o) {
+        return impl(o, m_value);
     }
 };
 
@@ -53,7 +45,6 @@ template<
     typename InputIterator,
     typename OutputIterator>
 __global__ void
-//__launch_bounds__(256, 8)
     transform(Fn f,
               InputIterator input,
               OutputIterator output,
@@ -81,50 +72,42 @@ thrust::device_vector<A> make_filled(int n) {
 
 int main() {
     typedef double T;
-    typedef trove::array<T, 3> n_array;
+    typedef trove::array<T, 6> n_array;
     int n = 100 * 8 * 256 * 15;
     thrust::device_vector<n_array> c = make_filled<n_array>(n);
-    trove::coalesced_ptr<n_array> c_c(thrust::raw_pointer_cast(c.data()));
-    thrust::device_vector<T> r(n);
-    T* d_r = thrust::raw_pointer_cast(r.data());
+    n_array* d_c = thrust::raw_pointer_cast(c.data());
+    trove::coalesced_ptr<n_array> c_c(d_c);
 
-    n_array center = trove::counting_array<n_array >::impl();
+    thrust::device_vector<n_array> r(n);
+    n_array* d_r = thrust::raw_pointer_cast(r.data());
+    trove::coalesced_ptr<n_array> c_r(d_r);
     
-    euclidean_distance<n_array> fn(center);
+    T value = 1;
+
+    update<n_array> fn(value);
     
     int nthreads = 256;
     int nblocks = min(15 * 8, n/nthreads);
     
     int iterations = 1;
-    cudaEvent_t start, stop;
-    float time = 0;
     std::cout << "Coalesced ";
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    cuda_timer timer;
+    timer.start();
     for(int j = 0; j < iterations; j++) {
-        transform<<<nblocks, nthreads>>>(fn, c_c, d_r, n);
+        transform<<<nblocks, nthreads>>>(fn, c_c, c_r, n);
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
-    float gbs = (float)(sizeof(n_array) * (iterations * (n + 1))) / (time * 1000000);
+    float time = timer.stop();
+    float gbs = (float)(sizeof(n_array) * (iterations * (2*n))) / (time * 1000000);
     std::cout << gbs << std::endl;
 
     
-    n_array* p_c(thrust::raw_pointer_cast(c.data()));
-
     std::cout << "Direct ";
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    timer.start();
     for(int j = 0; j < iterations; j++) {
-        transform<<<nblocks, nthreads>>>(fn, p_c, d_r, n);
+        transform<<<nblocks, nthreads>>>(fn, d_c, d_r, n);
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
-    gbs = (float)(sizeof(n_array) * (iterations * (n + 1))) / (time * 1000000);
+    time = timer.stop();
+    gbs = (float)(sizeof(n_array) * (iterations * (2*n))) / (time * 1000000);
     std::cout << gbs << std::endl;
 
     

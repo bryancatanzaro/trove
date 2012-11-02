@@ -1,5 +1,6 @@
 #pragma once
 #include <trove/detail/dismember.h>
+#include <trove/detail/fallback.h>
 #include <trove/transpose.h>
 #include <trove/utility.h>
 #include <trove/memory.h>
@@ -125,6 +126,7 @@ bool is_contiguous(int warp_id, const T* ptr) {
     return result;
 }
 
+
 template<typename T>
 struct size_in_range {
     typedef typename dismember_type<T>::type U;
@@ -142,24 +144,9 @@ struct use_shfl<T, true, true> {
     static const bool value = true;
 };
 
-template<typename T, int s=aliased_size<T, int>::value>
-struct use_vector {
-    static const bool value = false;
-};
-
-template<typename T>
-struct use_vector<T, 2> {
-    static const bool value = true;
-};
-
-template<typename T>
-struct use_vector<T, 4> {
-    static const bool value = true;
-};
-
 template<typename T>
 struct use_direct {
-    static const bool value = !(use_shfl<T>::value || use_vector<T>::value);
+    static const bool value = !(use_shfl<T>::value);
 };
 
 
@@ -189,14 +176,6 @@ load_dispatch(const T* src) {
     return *src;
 }
 
-template<typename T>
-__device__ typename enable_if<use_vector<T>::value, T>::type
-load_dispatch(const T* src) {
-    typedef typename dismember_type<T>::type U;
-    array<U, 1> data(*((const U*)src));
-    return detail::fuse<T>(data);
-}
-
 
 template<typename T>
 __device__ typename enable_if<use_shfl<T>::value>::type
@@ -222,15 +201,6 @@ store_dispatch(const T& data, T* dest) {
     *dest = data;
 }
 
-template<typename T>
-__device__ typename enable_if<use_vector<T>::value>::type
-store_dispatch(const T& data, T* dest) {
-    typedef typename dismember_type<T>::type U;
-    array<U, 1> lysed = detail::lyse<U>(data);
-    *((U*)dest) = lysed.head;
-}
-
-
 __device__
 bool is_converged() {
     return (__ballot(true) == WARP_CONVERGED);
@@ -240,14 +210,11 @@ bool is_converged() {
 
 template<typename T>
 __device__ T load(const T* src) {
-    T result; //NVCC will sometimes insert local DRAM loads & stores
-              //without this.
     if (detail::is_converged()) {
-        result = detail::load_dispatch(src);
+        return detail::load_dispatch(src);
     } else {
-        result = *src;
+        return detail::divergent_load(src);
     }
-    return result;
 }
 
 template<typename T>
@@ -255,7 +222,7 @@ __device__ void store(const T& data, T* dest) {
     if (detail::is_converged()) {
         detail::store_dispatch(data, dest);
     } else {
-        *dest = data;
+        detail::divergent_store(data, dest);
     }
 }
 

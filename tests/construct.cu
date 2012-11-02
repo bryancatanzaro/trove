@@ -1,10 +1,9 @@
 #include <trove/ptr.h>
-
+#include "timer.h"
 
 template<typename T,
          typename OutputIterator>
 __global__ void
-//__launch_bounds__(256, 8)
 construct(OutputIterator b,
           int len) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
@@ -19,44 +18,35 @@ construct(OutputIterator b,
 
 
 int main() {
-    typedef trove::array<double, 24> n_array;
-    int n = 100 * 8 * 256 * 15;
+    typedef double T;
+    typedef trove::array<T, 3> n_array;
+    int n = 100 * 8 * 256 * 15 - 100;
     thrust::device_vector<n_array> c(n);
 
-    trove::coalesced_ptr<n_array> c_c(thrust::raw_pointer_cast(c.data()));
+    n_array* p_c(thrust::raw_pointer_cast(c.data()));
+    trove::coalesced_ptr<n_array> c_c(p_c);
 
     int nthreads = 256;
     int nblocks = min(15 * 8, n/nthreads);
     
     int iterations = 10;
-    cudaEvent_t start, stop;
-    float time = 0;
+
     std::cout << "Coalesced ";
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    cuda_timer timer;
+    timer.start();
     for(int j = 0; j < iterations; j++) {
         construct<n_array><<<nblocks, nthreads>>>(c_c, n);
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
+    float time = timer.stop();
     float gbs = (float)(sizeof(n_array) * (iterations * (n + 1))) / (time * 1000000);
     std::cout << gbs << std::endl;
 
-    
-    n_array* p_c(thrust::raw_pointer_cast(c.data()));
-
     std::cout << "Direct ";
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    timer.start();
     for(int j = 0; j < iterations; j++) {
         construct<n_array><<<nblocks, nthreads>>>(p_c, n);
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
+    time = timer.stop();
     gbs = (float)(sizeof(n_array) * (iterations * (n + 1))) / (time * 1000000);
     std::cout << gbs << std::endl;
 

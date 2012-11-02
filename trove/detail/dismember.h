@@ -21,12 +21,12 @@ struct dismember_type<T, true, false, false> {
 
 template<typename T>
 struct dismember_type<T, true, true, false> {
-    typedef int2 type;
+    typedef int type;//typedef int2 type;
 };
 
 template<typename T>
 struct dismember_type<T, true, true, true> {
-    typedef int4 type;
+    typedef int type;//typedef int4 type;
 };
 
 

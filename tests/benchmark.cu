@@ -9,7 +9,9 @@
 #include <thrust/equal.h>
 
 
+
 #include <trove/ptr.h>
+#include "timer.h"
 
 using namespace trove;
 
@@ -113,17 +115,12 @@ void run_benchmark_contiguous_store(const std::string name, void (*test)(array<i
     int n = n_blocks * block_size - 100;
     thrust::device_vector<T> r(n);
     int iterations = 10;
-    cudaEvent_t start, stop;
-    float time = 0;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    cuda_timer timer;
+    timer.start();
     for(int j = 0; j < iterations; j++) {
         test<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(r.data()));
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
+    float time = timer.stop();
     float gbs = (float)(sizeof(T) * (iterations * n_blocks * block_size)) / (time * 1000000);
     std::cout << gbs << ", ";
     bool correct = true;
@@ -181,17 +178,12 @@ void run_benchmark_contiguous_load_store(const std::string name, void (*test)(ar
     fill_test(s);
     thrust::device_vector<T> r(n);
     int iterations = 10;
-    cudaEvent_t start, stop;
-    float time = 0;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    cuda_timer timer;
+    timer.start();
     for(int j = 0; j < iterations; j++) {
         test<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(r.data()));
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
+    float time = timer.stop();
     float gbs = (float)(2 * sizeof(T) * (iterations * n_blocks * block_size)) / (time * 1000000);
     std::cout << gbs << ", ";
     bool correct = true;
@@ -256,20 +248,15 @@ void run_benchmark_random(const std::string name, const thrust::device_vector<in
     fill_test(s);
     thrust::device_vector<T> r(n);
     int iterations = 10;
-    cudaEvent_t start, stop;
-    float time = 0;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
+    cuda_timer timer;
+    timer.start();
     for(int j = 0; j < iterations; j++) {
         test<<<n_blocks, block_size>>>(
             thrust::raw_pointer_cast(permutation.data()),
             thrust::raw_pointer_cast(s.data()),
             thrust::raw_pointer_cast(r.data()));
     }
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time, start, stop);
+    float time = timer.stop();
     float gbs = (float)(sizeof(T) * (2 * iterations * n_blocks * block_size) + sizeof(int) * iterations * n_blocks * block_size) / (time * 1000000);
     std::cout << gbs << ", ";
     bool correct = true;
