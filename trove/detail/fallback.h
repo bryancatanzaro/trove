@@ -1,4 +1,5 @@
 #pragma once
+#include <trove/utility.h>
 #include <trove/detail/dismember.h>
 
 namespace trove {
@@ -31,16 +32,28 @@ struct divergent_loader<1, T> {
     }
 };
 
+template<typename T>
+struct use_divergent {
+    static const bool value = (sizeof(T) % 4) == 0;
+};
 
 template<typename T>
 __device__
-T divergent_load(const T* src) {
+typename enable_if<use_divergent<T>::value, T>::type
+divergent_load(const T* src) {
     typedef typename detail::dismember_type<T>::type U;
     typedef array<U, detail::aliased_size<T, U>::value> u_store;
     u_store loaded =
         detail::divergent_loader<detail::aliased_size<T, U>::value, T>::impl(
             src);
     return detail::fuse<T>(loaded);
+}
+
+template<typename T>
+__device__
+typename enable_if<!use_divergent<T>::value, T>::type
+divergent_load(const T* src) {
+    return *src;
 }
 
 template<int s, typename T>
@@ -72,12 +85,20 @@ struct divergent_storer<1, T> {
 
 template<typename T>
 __device__
-void divergent_store(const T& data, T* dest) {
+typename enable_if<use_divergent<T>::value>::type
+divergent_store(const T& data, T* dest) {
     typedef typename detail::dismember_type<T>::type U;
     typedef array<U, detail::aliased_size<T, U>::value> u_store;
     u_store lysed = detail::lyse<U>(data);
     detail::divergent_storer<detail::aliased_size<T, U>::value, T>::impl(
         lysed, dest);
+}
+
+template<typename T>
+__device__
+typename enable_if<!use_divergent<T>::value>::type
+divergent_store(const T& data, T* dest) {
+    *dest = data;
 }
 
 
