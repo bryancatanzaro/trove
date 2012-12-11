@@ -5,19 +5,15 @@
 #include <trove/utility.h>
 #include <trove/memory.h>
 
-//#define WARP_CONVERGED ((1LL << WARP_SIZE) - 1)
-#define WARP_CONVERGED 0xffffffff
-
 namespace trove {
 
-namespace detail {
 template<typename T>
 __device__ T load_warp_contiguous(const T* src) {
     int warp_id = threadIdx.x & WARP_MASK;
     const T* warp_begin_src = src - warp_id;
     typedef typename detail::dismember_type<T>::type U;
     const U* as_int_src = (const U*)warp_begin_src;
-    typedef array<U, aliased_size<T, U>::value> int_store;
+    typedef array<U, detail::aliased_size<T, U>::value> int_store;
     int_store loaded = warp_load<int_store>(as_int_src, warp_id);
     r2c_warp_transpose(loaded);
     return detail::fuse<T>(loaded);
@@ -29,11 +25,13 @@ __device__ void store_warp_contiguous(const T& data, T* dest) {
     T* warp_begin_dest = dest - warp_id;
     typedef typename detail::dismember_type<T>::type U;
     U* as_int_dest = (U*)warp_begin_dest;
-    typedef array<U, aliased_size<T, U>::value> int_store;
+    typedef array<U, detail::aliased_size<T, U>::value> int_store;
     int_store lysed = detail::lyse<U>(data);
     c2r_warp_transpose(lysed);
     warp_store(lysed, as_int_dest, warp_id);
 }
+
+namespace detail {
 
 template<typename T>
 __device__ typename detail::dismember_type<T>::type*
@@ -200,6 +198,8 @@ __device__ typename enable_if<use_direct<T>::value>::type
 store_dispatch(const T& data, T* dest) {
     *dest = data;
 }
+
+#define WARP_CONVERGED 0xffffffff
 
 __device__
 bool is_converged() {
