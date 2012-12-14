@@ -15,3 +15,6 @@ transform: transform.cu
 
 copy: copy.cu
 	nvcc -arch=$(ARCH) -I../ -Xptxas -v copy.cu -o copy
+
+block: block.cu
+	nvcc -arch=$(ARCH) -I../ -Xptxas -v block.cu -o block
