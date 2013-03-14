@@ -18,3 +18,6 @@ copy: copy.cu
 
 block: block.cu
 	nvcc -arch=$(ARCH) -I../ -Xptxas -v block.cu -o block
+
+transpose: transpose.cu
+	nvcc -arch=$(ARCH) -I../ -Xptxas -v transpose.cu -o transpose
