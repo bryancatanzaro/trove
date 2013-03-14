@@ -1,6 +1,7 @@
 #pragma once
 #include <trove/detail/dismember.h>
 #include <trove/detail/fallback.h>
+#include <trove/detail/warp.h>
 #include <trove/transpose.h>
 #include <trove/utility.h>
 #include <trove/memory.h>
@@ -199,18 +200,12 @@ store_dispatch(const T& data, T* dest) {
     *dest = data;
 }
 
-#define WARP_CONVERGED 0xffffffff
-
-__device__
-bool is_converged() {
-    return (__ballot(true) == WARP_CONVERGED);
-}
-    
+  
 }
 
 template<typename T>
 __device__ T load(const T* src) {
-    if (detail::is_converged()) {
+    if (detail::warp_converged()) {
         return detail::load_dispatch(src);
     } else {
         return detail::divergent_load(src);
@@ -219,7 +214,7 @@ __device__ T load(const T* src) {
 
 template<typename T>
 __device__ void store(const T& data, T* dest) {
-    if (detail::is_converged()) {
+    if (detail::warp_converged()) {
         detail::store_dispatch(data, dest);
     } else {
         detail::divergent_store(data, dest);
