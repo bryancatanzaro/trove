@@ -40,18 +40,18 @@ benchmark_contiguous_direct_store(T* r) {
 
 template<typename T>
 __global__ void
-benchmark_contiguous_shfl_load_store(T* s, T* r) {
+benchmark_contiguous_shfl_load(T* s, typename T::value_type* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     T data = load_warp_contiguous(s + global_index);
-    store_warp_contiguous(data, r + global_index);
+    r[global_index] = sum(data);
 }
 
 template<typename T>
 __global__ void
-    benchmark_contiguous_direct_load_store(T* s, T* r) {
+benchmark_contiguous_direct_load(T* s, typename T::value_type* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     T data = s[global_index];
-    r[global_index] = data;
+    r[global_index] = sum(data);
 }
 
 template<typename T>
@@ -156,8 +156,8 @@ void fill_test(thrust::device_vector<T>& d) {
 }
 
 template<int i>
-void run_benchmark_contiguous_load_store(const std::string name, void (*test)(array<int, i>*, array<int, i>*),
-                                         void (*gold)(array<int, i>*, array<int, i>*)) {
+void run_benchmark_contiguous_load(const std::string name, void (*test)(array<int, i>*, int*),
+                                         void (*gold)(array<int, i>*, int*)) {
     typedef array<int, i> T;
 
     std::cout << name << ", " << i << ", ";
@@ -166,7 +166,7 @@ void run_benchmark_contiguous_load_store(const std::string name, void (*test)(ar
     int n = n_blocks * block_size;
     thrust::device_vector<T> s(n);
     fill_test(s);
-    thrust::device_vector<T> r(n);
+    thrust::device_vector<int> r(n);
     int iterations = 10;
     cuda_timer timer;
     timer.start();
@@ -174,11 +174,11 @@ void run_benchmark_contiguous_load_store(const std::string name, void (*test)(ar
         test<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(r.data()));
     }
     float time = timer.stop();
-    float gbs = (float)(2 * sizeof(T) * (iterations * n_blocks * block_size)) / (time * 1000000);
+    float gbs = (float)((sizeof(T) + sizeof(int)) * (iterations * n_blocks * block_size)) / (time * 1000000);
     std::cout << gbs << ", ";
     bool correct = true;
     if (test != gold) {
-        thrust::device_vector<T> g(n);
+        thrust::device_vector<int> g(n);
         gold<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(g.data()));
         correct = thrust::equal(r.begin(), r.end(), g.begin());
     }
@@ -193,18 +193,18 @@ void run_benchmark_contiguous_load_store(const std::string name, void (*test)(ar
 }
 
 template<int i>
-struct run_benchmark_contiguous_shfl_load_store {
+struct run_benchmark_contiguous_shfl_load {
     typedef array<int, i> T;
     static void impl() {
-        run_benchmark_contiguous_load_store("Contiguous SHFL Load/Store", &benchmark_contiguous_shfl_load_store<T>, &benchmark_contiguous_direct_load_store<T>);
+        run_benchmark_contiguous_load("Contiguous SHFL Load", &benchmark_contiguous_shfl_load<T>, &benchmark_contiguous_direct_load<T>);
     }
 };
 
 template<int i>
-struct run_benchmark_contiguous_direct_load_store {
+struct run_benchmark_contiguous_direct_load {
     typedef array<int, i> T;
     static void impl() {
-        run_benchmark_contiguous_load_store("Contiguous Direct Load/Store", &benchmark_contiguous_direct_load_store<T>, &benchmark_contiguous_direct_load_store<T>);
+        run_benchmark_contiguous_load("Contiguous Direct Load", &benchmark_contiguous_direct_load<T>, &benchmark_contiguous_direct_load<T>);
     }
 };
 
@@ -326,8 +326,8 @@ typedef static_range<LOWER_BOUND, UPPER_BOUND> sizes;
 int main() {
     do_tests<run_benchmark_contiguous_shfl_store, sizes>::impl();
     do_tests<run_benchmark_contiguous_direct_store, sizes>::impl();
-    do_tests<run_benchmark_contiguous_shfl_load_store, sizes>::impl();
-    do_tests<run_benchmark_contiguous_direct_load_store, sizes>::impl();
+    do_tests<run_benchmark_contiguous_shfl_load, sizes>::impl();
+    do_tests<run_benchmark_contiguous_direct_load, sizes>::impl();
     int size = 15 * 8 * 100 * 256;
     thrust::device_vector<int> permutation = make_random_permutation(size);
     do_tests<run_benchmark_shfl_scatter, sizes>::impl(permutation);
