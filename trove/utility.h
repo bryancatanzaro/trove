@@ -24,6 +24,32 @@ struct counting_array<array<T, 1> > {
     }
 };
 
+template<typename T>
+struct sum_array {};
+
+template<typename T, int s>
+struct sum_array<array<T, s> > {
+    typedef array<T, s> Array;
+    __host__ __device__
+    static T impl(const Array& a, const T& p) {
+        return sum_array<typename Array::tail_type>::impl(a.tail, p + a.head);
+    }
+};
+
+template<typename T>
+struct sum_array<array<T, 1> > {
+    typedef array<T, 1> Array;
+    __host__ __device__
+    static T impl(const Array& a, const T& p) {
+        return p + a.head;
+    }
+};
+
+template<typename T, int s>
+__host__ __device__ T sum(const array<T, s>& a) {
+    return sum_array<array<T, s> >::impl(a, 0);
+}
+
 template<int m>
 struct static_log {
     static const int value = 1 + static_log<m >> 1>::value;
