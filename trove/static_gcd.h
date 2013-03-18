@@ -35,22 +35,22 @@ namespace detail {
 
 template<bool u_odd, bool v_odd, int u, int v>
 struct static_gcd_helper {
-    static const int value = static_gcd<u>>1, v>>1>::value << 1;
+    static const int value = static_gcd<(u>>1), (v>>1)>::value << 1;
 };
 
 template<int u, int v>
 struct static_gcd_helper<false, true, u, v> {
-    static const int value = static_gcd<u>>1, v>::value;
+    static const int value = static_gcd<(u>>1), v>::value;
 };
 
 template<int u, int v>
 struct static_gcd_helper<true, false, u, v> {
-    static const int value = static_gcd<u, v>>1>::value;
+    static const int value = static_gcd<u, (v>>1)>::value;
 };
 
 template<int u, int v>
 struct static_gcd_helper<true, true, u, v> {
-    static const int reduced_u = (u > v) ? (u - v) >> 1 : (v - u) >> 1;
+    static const int reduced_u = (u > v) ? ((u - v) >> 1) : ((v - u) >> 1);
     static const int reduced_v = (u > v) ? v : u;
     static const int value = static_gcd<reduced_u, reduced_v>::value;
 };
