@@ -60,6 +60,54 @@ whether the warp is converged, and also broadcast all pointers from
 all threads in each warp to all other threads in the warp, but it is
 simple to use.
 
+Block Interface
+===============
+
+It's common for CUDA code to process or produce several values per thread. For
+example, a reduction may process 7 values per thread, to increase the
+amount of serial work. For these cases, we provide a blocked interface
+that enables efficient block-wise vector loads and stores.
+
+This interface relies on an array type `trove::array<T, s>`, where `T`
+is the type of each element of the array, and `s` is an integer that
+statically determines the length of the array.  `trove::array` types
+can be converted to and from standard C arrays (see
+[array.h](http://github.com/BryanCatanzaro/trove/blob/master/trove/array.h)
+), but they have value
+semantics rather than reference semantics, and they can only be
+indexed statically.
+
+With this interface, each thread is assumed to be reading or writing
+from contiguous locations in the input or output array.  The user is
+responsible for checking for convergence, which they probably do
+anyway for functional reasons.  If the warp is not converged, we
+provide fallback functions that load and store arrays using compiler
+generated code.
+
+```c++
+template<typename T, int s>
+__global__ void test_block_copy(const T* x, T* r, int l) {
+    typedef trove::array<T, s> s_ary;
+    int global_index = threadIdx.x + blockIdx.x * blockDim.x;
+
+    for(int index = global_index; index < l; index += gridDim.x * blockDim.x) {
+
+        //The block memory accesses only function
+        //correctly if the warp is converged. Here we check.
+        if (trove::warp_converged()) {
+            //Warp converged, indices are contiguous, call the fast
+            //load and store
+            s_ary d = trove::load_array_warp_contiguous<s>(x, index);
+            trove::store_array_warp_contiguous(r, index, d);
+        } else {
+            //Warp not converged, call the slow load and store
+            s_ary d = trove::load_array<s>(x, index);
+            trove::store_array(r, index, d);
+        }
+    }
+}
+```
+
 Low-level Interface
 ===================
 
@@ -68,7 +116,7 @@ accessing contiguous locations in your array, you can use the
 low-level interface for maximum performance. By contiguous, we mean
 that if threads with indices *i* and thread *j* are in the same warp,
 the pointers *pi* and *pj* you pass to the library must obey the
-relation *pj*-*pi* == *j* - *i*.  The low-level interface has the
+relation *pj* - *pi* == *j* - *i*.  The low-level interface has the
 following functions in `<trove/aos.h>`:
 
 `template<typename T> __device__ T load_warp_contiguous(const T*
