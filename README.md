@@ -64,7 +64,7 @@ Block Interface
 ===============
 
 It's common for CUDA code to process or produce several values per thread. For
-example, a reduction may process 7 values per thread, to increase the
+example, a merge operation may process 7 values per thread, to increase the
 amount of serial work. For these cases, we provide a blocked interface
 that enables efficient block-wise vector loads and stores.
 
