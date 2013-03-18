@@ -86,6 +86,8 @@ provide fallback functions that load and store arrays using compiler
 generated code.
 
 ```c++
+#include <trove/block.h>
+
 template<typename T, int s>
 __global__ void test_block_copy(const T* x, T* r, int l) {
     typedef trove::array<T, s> s_ary;
