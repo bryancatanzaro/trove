@@ -26,7 +26,8 @@ Performance
 ===========
 
 Accesses to arrays of structures can be 6X faster than direct memory
-accesses using compiler generated loads and stores.
+accesses using compiler generated loads and stores. The following
+benchmarks were taken on a Tesla K20c.
 
 ![Contiguous](https://raw.github.com/BryanCatanzaro/trove/master/doc/contiguous.png)
 ![Random](https://raw.github.com/BryanCatanzaro/trove/master/doc/random.png)
