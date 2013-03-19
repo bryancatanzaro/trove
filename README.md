@@ -27,7 +27,8 @@ Performance
 
 Accesses to arrays of structures can be 6X faster than direct memory
 accesses using compiler generated loads and stores. The following
-benchmarks were taken on a Tesla K20c.
+benchmarks were taken on a Tesla K20c.  The structure `T` being loaded
+and stored in these benchmarks is made of one to sixteen 32-bit integers.
 
 ![Contiguous](https://raw.github.com/BryanCatanzaro/trove/master/doc/contiguous.png)
 ![Random](https://raw.github.com/BryanCatanzaro/trove/master/doc/random.png)
