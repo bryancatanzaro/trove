@@ -40,14 +40,14 @@ High-level Interface
 
 template<typename T>
 __global__ void
-shfl_gather(const int length, const int* indices, T* raw_source, T* raw_dest) {
+trove_gather(const int length, const int* indices,
+             trove::coalesced_ptr<T> src, //Wrapped pointer
+             trove::coalesced_ptr<T> dst) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     if (global_index < length) {
         int index = indices[global_index];
-        trove::coalesced_ptr<T> source(raw_source);
-        trove::coalesced_ptr<T> dest(raw_dest);
-        T data = s[index];
-        r[global_index] = data;
+        T data = src[index];
+        dst[global_index] = data;
     }
 }
 ```
