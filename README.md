@@ -8,6 +8,8 @@ working with data in an Array of Structures format, and also when
 writing code that consumes or produces an array of data per CUDA
 thread.
 
+How it Works
+============
 
 This functionality is built out of a transposition routine that uses
 the warp shuffle intrinsic to redistribute data amongst threads in the
@@ -61,6 +63,11 @@ interface loses some performance, since it has to dynamically check
 whether the warp is converged, and also broadcast all pointers from
 all threads in each warp to all other threads in the warp, but it is
 simple to use.
+
+
+There are two restrictions on `T`:
+    * `sizeof(T)` must be divisible by 4
+    * `T` must have a default constructor
 
 Block Interface
 ===============
