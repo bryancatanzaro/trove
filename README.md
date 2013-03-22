@@ -66,8 +66,9 @@ simple to use.
 
 
 There are two restrictions on `T`:
-    * `sizeof(T)` must be divisible by 4
-    * `T` must have a default constructor
+
+ * `sizeof(T)` must be divisible by 4
+ * `T` must have a default constructor
 
 Block Interface
 ===============
