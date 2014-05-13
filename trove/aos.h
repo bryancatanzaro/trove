@@ -35,8 +35,36 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace trove {
 
+namespace detail {
+
 template<typename T>
-__device__ T load_warp_contiguous(const T* src) {
+struct size_in_range {
+    typedef typename dismember_type<T>::type U;
+    static const int size = aliased_size<T, U>::value;
+    static const bool value = (size > 1) && (size < 64);
+};
+
+template<typename T, bool s=size_multiple_power_of_two<T, 2>::value, bool r=size_in_range<T>::value>
+struct use_shfl {
+    static const bool value = false;
+};
+
+template<typename T>
+struct use_shfl<T, true, true> {
+    static const bool value = true;
+};
+
+template<typename T>
+struct use_direct {
+    static const bool value = !(use_shfl<T>::value);
+};
+
+}
+
+
+template<typename T>
+__device__ typename enable_if<detail::use_shfl<T>::value, T>::type
+load_warp_contiguous(const T* src) {
     int warp_id = threadIdx.x & WARP_MASK;
     const T* warp_begin_src = src - warp_id;
     typedef typename detail::dismember_type<T>::type U;
@@ -46,9 +74,17 @@ __device__ T load_warp_contiguous(const T* src) {
     r2c_warp_transpose(loaded);
     return detail::fuse<T>(loaded);
 }
- 
+
 template<typename T>
-__device__ void store_warp_contiguous(const T& data, T* dest) {
+__device__ typename enable_if<detail::use_direct<T>::value, T>::type
+load_warp_contiguous(const T* src) {
+    return detail::divergent_load(src);
+}
+
+
+template<typename T>
+__device__ typename enable_if<detail::use_shfl<T>::value>::type
+store_warp_contiguous(const T& data, T* dest) {
     int warp_id = threadIdx.x & WARP_MASK;
     T* warp_begin_dest = dest - warp_id;
     typedef typename detail::dismember_type<T>::type U;
@@ -58,6 +94,13 @@ __device__ void store_warp_contiguous(const T& data, T* dest) {
     c2r_warp_transpose(lysed);
     warp_store(lysed, as_int_dest, warp_id);
 }
+
+template<typename T>
+__device__ typename enable_if<detail::use_direct<T>::value>::type
+store_warp_contiguous(const T& data, T* dest) {
+    detail::divergent_store(data, dest);
+}
+
 
 namespace detail {
 
@@ -151,30 +194,6 @@ bool is_contiguous(int warp_id, const T* ptr) {
     bool result = __all(neighbor_contiguous);
     return result;
 }
-
-
-template<typename T>
-struct size_in_range {
-    typedef typename dismember_type<T>::type U;
-    static const int size = aliased_size<T, U>::value;
-    static const bool value = (size > 1) && (size < 64);
-};
-
-template<typename T, bool s=size_multiple_power_of_two<T, 2>::value, bool r=size_in_range<T>::value>
-struct use_shfl {
-    static const bool value = false;
-};
-
-template<typename T>
-struct use_shfl<T, true, true> {
-    static const bool value = true;
-};
-
-template<typename T>
-struct use_direct {
-    static const bool value = !(use_shfl<T>::value);
-};
-
 
 
 template<typename T>
