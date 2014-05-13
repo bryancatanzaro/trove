@@ -196,10 +196,12 @@ load_dispatch(const T* src) {
     // }   
 }
 
+
+
 template<typename T>
 __device__ typename enable_if<use_direct<T>::value, T>::type
 load_dispatch(const T* src) {
-    return *src;
+    return detail::divergent_load(src);
 }
 
 
@@ -224,7 +226,7 @@ store_dispatch(const T& data, T* dest) {
 template<typename T>
 __device__ typename enable_if<use_direct<T>::value>::type
 store_dispatch(const T& data, T* dest) {
-    *dest = data;
+    detail::divergent_store(data, dest);
 }
 
   
