@@ -79,7 +79,7 @@ __host__ __device__ T sum(const array<T, s>& a) {
 
 template<int m>
 struct static_log {
-    static const int value = 1 + static_log<m >> 1>::value;
+    static const int value = 1 + static_log< (m >> 1) >::value;
 };
 
 template<>
