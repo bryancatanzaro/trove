@@ -32,7 +32,7 @@ namespace trove {
 #define WARP_CONVERGED 0xffffffff
 
 __device__
-bool warp_converged() {
+inline bool warp_converged() {
     return (__ballot(true) == WARP_CONVERGED);
 }
 
