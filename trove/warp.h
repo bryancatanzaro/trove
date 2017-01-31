@@ -38,8 +38,10 @@ inline bool warp_converged() {
 
 #undef WARP_CONVERGED
 
-#define WARP_SIZE 32
-#define WARP_MASK 0x1f
-#define LOG_WARP_SIZE 5
+enum {
+    WARP_SIZE = 32,
+    WARP_MASK = 0x1f,
+    LOG_WARP_SIZE = 5
+};
 
 }
