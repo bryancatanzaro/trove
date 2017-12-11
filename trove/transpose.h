@@ -417,7 +417,11 @@ template<typename T, int m>
 struct warp_shuffle<array<T, m>, array<int, m> > {
     __device__ static void impl(array<T, m>& d,
                                 const array<int, m>& i) {
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+        d.head = __shfl_sync(0xFFFFFFFF, d.head, i.head);
+#else
         d.head = __shfl(d.head, i.head);
+#endif
         warp_shuffle<array<T, m-1>, array<int, m-1> >::impl(d.tail,
                                                             i.tail);
     }
@@ -427,7 +431,11 @@ template<typename T>
 struct warp_shuffle<array<T, 1>, array<int, 1> > {
     __device__ static void impl(array<T, 1>& d,
                                 const array<int, 1>& i) {
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+        d.head = __shfl_sync(0xFFFFFFFF, d.head, i.head);
+#else
         d.head = __shfl(d.head, i.head);
+#endif
     }
 };
 

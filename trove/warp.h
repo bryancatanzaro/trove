@@ -33,7 +33,11 @@ namespace trove {
 
 __device__
 inline bool warp_converged() {
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+    return (__activemask() == WARP_CONVERGED);
+#else
     return (__ballot(true) == WARP_CONVERGED);
+#endif
 }
 
 #undef WARP_CONVERGED

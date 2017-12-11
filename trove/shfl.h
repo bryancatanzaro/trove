@@ -29,7 +29,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <trove/array.h>
 #include <trove/detail/dismember.h>
 
-
 namespace trove {
 namespace detail {
 
@@ -37,7 +36,11 @@ template<int s>
 struct shuffle {
     __device__
     static void impl(array<int, s>& d, const int& i) {
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+        d.head = __shfl_sync(0xFFFFFFFF, d.head, i);
+#else
         d.head = __shfl(d.head, i);
+#endif
         shuffle<s-1>::impl(d.tail, i);
     }
 };
@@ -46,9 +49,32 @@ template<>
 struct shuffle<1> {
     __device__
     static void impl(array<int, 1>& d, const int& i) {
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+        d.head = __shfl_sync(0xFFFFFFFF, d.head, i);
+#else
         d.head = __shfl(d.head, i);
+#endif
     }
 };
+
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+template<int s>
+struct shuffle_sync {
+    __device__
+    static void impl(unsigned mask, array<int, s>& d, const int& i) {
+        d.head = __shfl_sync(mask, d.head, i);
+        shuffle_sync<s-1>::impl(mask, d.tail, i);
+    }
+};
+
+template<>
+struct shuffle_sync<1> {
+    __device__
+    static void impl(unsigned mask, array<int, 1>& d, const int& i) {
+        d.head = __shfl_sync(mask, d.head, i);
+    }
+};
+#endif
 
 }
 }
@@ -64,3 +90,17 @@ T __shfl(const T& t, const int& i) {
       ::impl(lysed, i);
     return trove::detail::fuse<T>(lysed);
 }
+
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+template<typename T>
+__device__
+T __shfl_sync(unsigned mask, const T& t, const int& i) {
+    typedef trove::array<int,
+                         trove::detail::aliased_size<T, int>::value>
+        lysed_array;
+    lysed_array lysed = trove::detail::lyse<int>(t);
+    trove::detail::shuffle_sync<lysed_array::size>
+      ::impl(mask, lysed, i);
+    return trove::detail::fuse<T>(lysed);
+}
+#endif
