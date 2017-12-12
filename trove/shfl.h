@@ -37,7 +37,7 @@ struct shuffle {
     __device__
     static void impl(array<int, s>& d, const int& i) {
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
-        d.head = __shfl_sync(0xFFFFFFFF, d.head, i);
+        d.head = __shfl_sync(WARP_CONVERGED, d.head, i);
 #else
         d.head = __shfl(d.head, i);
 #endif
@@ -50,7 +50,7 @@ struct shuffle<1> {
     __device__
     static void impl(array<int, 1>& d, const int& i) {
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
-        d.head = __shfl_sync(0xFFFFFFFF, d.head, i);
+        d.head = __shfl_sync(WARP_CONVERGED, d.head, i);
 #else
         d.head = __shfl(d.head, i);
 #endif

@@ -29,7 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace trove {
 
-#define WARP_CONVERGED 0xffffffff
+enum {
+    WARP_SIZE = 32,
+    WARP_MASK = 0x1f,
+    WARP_CONVERGED = 0xFFFFFFFF,
+    LOG_WARP_SIZE = 5
+};
 
 __device__
 inline bool warp_converged() {
@@ -39,13 +44,5 @@ inline bool warp_converged() {
     return (__ballot(true) == WARP_CONVERGED);
 #endif
 }
-
-#undef WARP_CONVERGED
-
-enum {
-    WARP_SIZE = 32,
-    WARP_MASK = 0x1f,
-    LOG_WARP_SIZE = 5
-};
 
 }

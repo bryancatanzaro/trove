@@ -109,7 +109,7 @@ __device__ typename detail::dismember_type<T>::type*
 compute_address(T* src, int div, int mod) {
     typedef typename detail::dismember_type<T>::type U;
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
-    T* base_ptr = __shfl_sync(0xFFFFFFFF, src, div);
+    T* base_ptr = __shfl_sync(WARP_CONVERGED, src, div);
 #else
     T* base_ptr = __shfl(src, div);
 #endif
@@ -194,7 +194,7 @@ __device__
 bool is_contiguous(int warp_id, const T* ptr) {
     int neighbor_idx = (warp_id == 0) ? 0 : warp_id-1;
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
-    const T* neighbor_ptr = __shfl_sync(0xFFFFFFFF, ptr, neighbor_idx);
+    const T* neighbor_ptr = __shfl_sync(WARP_CONVERGED, ptr, neighbor_idx);
 #else
     const T* neighbor_ptr = __shfl(ptr, neighbor_idx);
 #endif
