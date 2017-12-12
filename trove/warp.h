@@ -29,19 +29,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace trove {
 
-#define WARP_CONVERGED 0xffffffff
-
-__device__
-inline bool warp_converged() {
-    return (__ballot(true) == WARP_CONVERGED);
-}
-
-#undef WARP_CONVERGED
-
 enum {
     WARP_SIZE = 32,
     WARP_MASK = 0x1f,
+    WARP_CONVERGED = 0xFFFFFFFF,
     LOG_WARP_SIZE = 5
 };
+
+__device__
+inline bool warp_converged() {
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+    return (__activemask() == WARP_CONVERGED);
+#else
+    return (__ballot(true) == WARP_CONVERGED);
+#endif
+}
 
 }
