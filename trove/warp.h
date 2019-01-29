@@ -36,6 +36,10 @@ enum {
     LOG_WARP_SIZE = 5
 };
 
+inline __device__ int thread_id() {
+  return (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
+}
+
 __device__
 inline bool warp_converged() {
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 9000

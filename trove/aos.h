@@ -65,7 +65,7 @@ struct use_direct {
 template<typename T>
 __device__ typename enable_if<detail::use_shfl<T>::value, T>::type
 load_warp_contiguous(const T* src) {
-    int warp_id = threadIdx.x & WARP_MASK;
+    int warp_id = thread_id() & WARP_MASK;
     const T* warp_begin_src = src - warp_id;
     typedef typename detail::dismember_type<T>::type U;
     const U* as_int_src = (const U*)warp_begin_src;
@@ -85,7 +85,7 @@ load_warp_contiguous(const T* src) {
 template<typename T>
 __device__ typename enable_if<detail::use_shfl<T>::value>::type
 store_warp_contiguous(const T& data, T* dest) {
-    int warp_id = threadIdx.x & WARP_MASK;
+    int warp_id = thread_id() & WARP_MASK;
     T* warp_begin_dest = dest - warp_id;
     typedef typename detail::dismember_type<T>::type U;
     U* as_int_dest = (U*)warp_begin_dest;
@@ -134,7 +134,7 @@ __device__ void update_indices(int& div, int& mod) {
     }
     div += address_constants<T>::div_offset;
 }
-        
+
 
 template<int s, typename T>
 struct indexed_load {
@@ -145,8 +145,8 @@ struct indexed_load {
         U* address = compute_address(src, div, mod);
         result = *address;
         update_indices<T>(div, mod);
-        
-        
+
+
         return array<U, s>(
             result,
             indexed_load<s-1, T>::impl(src, div, mod));
@@ -207,7 +207,7 @@ bool is_contiguous(int warp_id, const T* ptr) {
 template<typename T>
 __device__ typename enable_if<use_shfl<T>::value, T>::type
 load_dispatch(const T* src) {
-    int warp_id = threadIdx.x & WARP_MASK;
+    int warp_id = thread_id() & WARP_MASK;
     // if (detail::is_contiguous(warp_id, src)) {
     //     return detail::load_warp_contiguous(src);
     // } else {
@@ -220,7 +220,7 @@ load_dispatch(const T* src) {
                 warp_id % address_constants<T>::m);
         r2c_warp_transpose(loaded);
         return detail::fuse<T>(loaded);
-    // }   
+    // }
 }
 
 
@@ -235,7 +235,7 @@ load_dispatch(const T* src) {
 template<typename T>
 __device__ typename enable_if<use_shfl<T>::value>::type
 store_dispatch(const T& data, T* dest) {
-    int warp_id = threadIdx.x & WARP_MASK;
+    int warp_id = thread_id() & WARP_MASK;
     // if (detail::is_contiguous(warp_id, dest)) {
     //     detail::store_warp_contiguous(data, dest);
     // } else {
@@ -256,7 +256,7 @@ store_dispatch(const T& data, T* dest) {
     detail::divergent_store(data, dest);
 }
 
-  
+
 }
 
 template<typename T>
