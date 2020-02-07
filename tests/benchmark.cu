@@ -128,7 +128,7 @@ void run_benchmark_contiguous_store(const std::string name, void (*test)(array<i
     typedef array<int, i> T;
 
     std::cout << name << ", " << i << ", ";
-    int n_blocks = 15 * 8 * 100;
+    int n_blocks = 80 * 8 * 100;
     int block_size = 256;
     int n = n_blocks * block_size - 100;
     thrust::device_vector<T> r(n);
@@ -189,7 +189,7 @@ void run_benchmark_contiguous_load(const std::string name, void (*test)(array<in
     typedef array<int, i> T;
 
     std::cout << name << ", " << i << ", ";
-    int n_blocks = 15 * 8 * 100;
+    int n_blocks = 80 * 8 * 100;
     int block_size = 256;
     int n = n_blocks * block_size;
     thrust::device_vector<T> s(n);
@@ -259,7 +259,7 @@ void run_benchmark_random(const std::string name, const thrust::device_vector<in
     typedef array<int, i> T;
 
     std::cout << name << ", " << i << ", ";
-    int n_blocks = 15 * 8 * 100;
+    int n_blocks = 80 * 8 * 100;
     int block_size = 256;
     int n = n_blocks * block_size;
     thrust::device_vector<T> s(n);
@@ -356,7 +356,7 @@ int main() {
     do_tests<run_benchmark_contiguous_direct_store, sizes>::impl();
     do_tests<run_benchmark_contiguous_shfl_load, sizes>::impl();
     do_tests<run_benchmark_contiguous_direct_load, sizes>::impl();
-    int size = 15 * 8 * 100 * 256;
+    int size = 80 * 8 * 100 * 256;
     thrust::device_vector<int> permutation = make_random_permutation(size);
     do_tests<run_benchmark_shfl_scatter, sizes>::impl(permutation);
     do_tests<run_benchmark_direct_scatter, sizes>::impl(permutation);

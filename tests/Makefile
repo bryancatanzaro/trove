@@ -1,4 +1,4 @@
-ARCH ?= sm_35
+ARCH ?= sm_70
 LOWER_BOUND ?= 1
 UPPER_BOUND ?= 16
 
