@@ -68,18 +68,22 @@ benchmark_contiguous_direct_store(T* r) {
 
 template<typename T>
 __global__ void
-benchmark_contiguous_shfl_load(T* s, typename T::value_type* r) {
+benchmark_contiguous_shfl_load(T* s, typename T::value_type* r, bool doStore) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     T data = load_warp_contiguous(s + global_index);
-    r[global_index] = sum(data);
+    asm (""::: "memory");
+    if (s && doStore)
+        r[global_index] = sum(data);
 }
 
 template<typename T>
 __global__ void
-benchmark_contiguous_direct_load(T* s, typename T::value_type* r) {
+benchmark_contiguous_direct_load(T* s, typename T::value_type* r, bool doStore) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
     T data = s[global_index];
-    r[global_index] = sum(data);
+    asm (""::: "memory");
+    if (s && doStore)
+        r[global_index] = sum(data);
 }
 
 template<typename T>
@@ -184,8 +188,8 @@ void fill_test(thrust::device_vector<T>& d) {
 }
 
 template<int i>
-void run_benchmark_contiguous_load(const std::string name, void (*test)(array<int, i>*, int*),
-                                         void (*gold)(array<int, i>*, int*)) {
+void run_benchmark_contiguous_load(const std::string name, void (*test)(array<int, i>*, int*, bool),
+                                         void (*gold)(array<int, i>*, int*, bool) ) {
     typedef array<int, i> T;
 
     std::cout << name << ", " << i << ", ";
@@ -199,7 +203,7 @@ void run_benchmark_contiguous_load(const std::string name, void (*test)(array<in
     cuda_timer timer;
     timer.start();
     for(int j = 0; j < iterations; j++) {
-        test<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(r.data()));
+        test<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(r.data()), false);
     }
     float time = timer.stop();
     float gbs = (float)((sizeof(T) + sizeof(int)) * (iterations * n_blocks * block_size)) / (time * 1000000);
@@ -207,7 +211,8 @@ void run_benchmark_contiguous_load(const std::string name, void (*test)(array<in
     bool correct = true;
     if (test != gold) {
         thrust::device_vector<int> g(n);
-        gold<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(g.data()));
+        test<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(r.data()), true);
+        gold<<<n_blocks, block_size>>>(thrust::raw_pointer_cast(s.data()), thrust::raw_pointer_cast(g.data()), true);
         correct = thrust::equal(r.begin(), r.end(), g.begin());
     }
     
