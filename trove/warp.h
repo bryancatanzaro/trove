@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace trove {
 
-enum {
+enum : unsigned {
     WARP_SIZE = 32,
     WARP_MASK = 0x1f,
     WARP_CONVERGED = 0xFFFFFFFF,
