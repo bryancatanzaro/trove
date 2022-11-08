@@ -231,17 +231,6 @@ struct make_array_impl<T, 1> {
     }
 };
 
-template<typename T>
-struct make_array_impl<T, 0> {
-    typedef array<T, 0> result_type;
-    __host__ __device__
-    static result_type impl(T ary[0]) {
-        return result_type();
-    }
-};
-
-
-
 
 template<typename T, int s>
 struct make_carray_impl {
@@ -262,13 +251,6 @@ struct make_carray_impl<T, 1> {
     }
 };
 
-
-template<typename T>
-struct make_carray_impl<T, 0> {
-    __host__ __device__
-    static void impl(array<T, 0>, T result[0]) {}
-};
- 
 } //end namespace detail
  
 template<typename T, int s>
