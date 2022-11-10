@@ -70,7 +70,7 @@ load_warp_contiguous(const T* src, Tile &tile) {
     typedef typename detail::dismember_type<T>::type U;
     const U* as_int_src = (const U*)warp_begin_src;
     typedef array<U, detail::aliased_size<T, U>::value> int_store;
-    int_store loaded = warp_load<int_store>(as_int_src, warp_id);
+    int_store loaded = warp_load<int_store>(as_int_src, warp_id, tile.size());
     r2c_warp_transpose(loaded, tile);
     return detail::fuse<T>(loaded);
 }
@@ -97,7 +97,7 @@ store_warp_contiguous(const T& data, T* dest, Tile &tile) {
     typedef array<U, detail::aliased_size<T, U>::value> int_store;
     int_store lysed = detail::lyse<U>(data);
     c2r_warp_transpose(lysed, tile);
-    warp_store(lysed, as_int_dest, warp_id);
+    warp_store(lysed, as_int_dest, warp_id, tile.size());
 }
 
 template<typename T, typename Tile>
