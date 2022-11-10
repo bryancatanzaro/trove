@@ -218,7 +218,7 @@ struct c2r_compute_initial_offset {};
 template<typename Tile, int m>
 struct c2r_compute_initial_offset<Tile, m, odd> {
     typedef c2r_offset_constants<Tile, m> constants;
-    __device__ static int impl(Tile &tile) {
+    __device__ static int impl(const Tile &tile) {
         int warp_id = tile.id();
         int initial_offset = ((Tile::size() - tile.id()) * constants::offset)
             & tile.mask();
@@ -228,7 +228,7 @@ struct c2r_compute_initial_offset<Tile, m, odd> {
 
 template<typename Tile, int m>
 struct c2r_compute_initial_offset<Tile, m, power_of_two> {
-    __device__ static int impl(Tile &tile) {
+    __device__ static int impl(const Tile &tile) {
         int warp_id = tile.id();
         int initial_offset = ((warp_id * (tile.size() + 1)) >>
                               static_log<m>::value)
@@ -243,7 +243,7 @@ struct r2c_compute_initial_offset {};
 template<int m>
 struct r2c_compute_initial_offset<m, odd> {
     template <typename Tile>
-    __device__ static int impl(Tile &tile) {
+    __device__ static int impl(const Tile &tile) {
         int warp_id = tile.id();
         int initial_offset = (warp_id * m) & tile.mask();
         return initial_offset;
@@ -253,7 +253,7 @@ struct r2c_compute_initial_offset<m, odd> {
 
 template<typename Tile, int m, typename Schema>
 __device__
-array<int, m> c2r_compute_offsets(Tile &tile) {
+array<int, m> c2r_compute_offsets(const Tile &tile) {
     typedef c2r_offset_constants<Tile, m> constants;
     int initial_offset = c2r_compute_initial_offset<Tile, m, Schema>::impl(tile);
     return c2r_compute_offsets_impl<array<int, m>,
@@ -402,7 +402,7 @@ struct r2c_compute_composite_offsets<Tile, array<int, 1>, m> {
 
 template<typename Tile,int m, typename Schema>
 __device__
-array<int, m> r2c_compute_offsets(Tile &tile) {
+array<int, m> r2c_compute_offsets(const Tile &tile) {
   typedef r2c_offset_constants<Tile, m> constants;
     typedef array<int, m> result_type;
     int initial_offset = r2c_compute_initial_offset<m, Schema>::impl(tile);
@@ -419,7 +419,7 @@ struct warp_shuffle<array<T, m>, array<int, m>> {
     template <typename Tile>
     __device__ static void impl(array<T, m>& d,
                                 const array<int, m>& i,
-                                Tile &tile) {
+                                const Tile &tile) {
         d.head = tile.shfl(d.head, i.head);
         warp_shuffle<array<T, m-1>, array<int, m-1> >::impl(d.tail,
                                                             i.tail,
@@ -432,7 +432,7 @@ struct warp_shuffle<array<T, 1>, array<int, 1>> {
     template <typename Tile>
     __device__ static void impl(array<T, 1>& d,
                                 const array<int, 1>& i,
-                                Tile &tile) {
+                                const Tile &tile) {
         d.head = tile.shfl(d.head, i.head);
     }
 };
@@ -444,7 +444,7 @@ struct c2r_compute_indices_impl {};
 template<typename Array>
 struct c2r_compute_indices_impl<Array, odd> {
     template <typename Tile>
-    __device__ static void impl(Array& indices, int& rotation, Tile &tile) {
+    __device__ static void impl(Array& indices, int& rotation, const Tile &tile) {
         indices = detail::c2r_compute_offsets<Tile, Array::size, odd>(tile);
         int warp_id = tile.id();
         int size = Array::size;
@@ -456,7 +456,7 @@ struct c2r_compute_indices_impl<Array, odd> {
 template<typename Array>
 struct c2r_compute_indices_impl<Array, power_of_two> {
     template <typename Tile>
-    __device__ static void impl(Array& indices, int& rotation, Tile &tile) {
+    __device__ static void impl(Array& indices, int& rotation, const Tile &tile) {
         indices = detail::c2r_compute_offsets<Tile, Array::size, power_of_two>(tile);
         int warp_id = tile.id();
         int size = Array::size;
@@ -467,7 +467,7 @@ struct c2r_compute_indices_impl<Array, power_of_two> {
 template<typename Array>
 struct c2r_compute_indices_impl<Array, composite> {
     template <typename Tile>
-    __device__ static void impl(Array& indices, int& rotation, Tile &tile) {
+    __device__ static void impl(Array& indices, int& rotation, const Tile &tile) {
         int warp_id = tile.id();
         indices = detail::c2r_compute_composite_offsets<Tile, Array, Array::size>::
             impl(warp_id, warp_id);
@@ -484,7 +484,7 @@ struct c2r_warp_transpose_impl<Array, Indices, odd> {
     __device__ static void impl(Array& src,
                                 const Indices& indices,
                                 const int& rotation,
-                                Tile &tile) {
+                                const Tile &tile) {
         detail::warp_shuffle<Array, Indices>::impl(src, indices, tile);
         src = rotate(detail::c2r_tx_permute<Tile>(src), rotation);
     }
@@ -496,7 +496,7 @@ struct c2r_warp_transpose_impl<Array, Indices, power_of_two> {
     __device__ static void impl(Array& src,
                                 const Indices& indices,
                                 const int& rotation,
-                                Tile &tile) {
+                                const Tile &tile) {
         int warp_id = tile.id();
         int pre_rotation = warp_id >>
             (tile.log_size()-
@@ -513,7 +513,7 @@ struct c2r_warp_transpose_impl<Array, Indices, composite> {
     __device__ static void impl(Array& src,
                                 const Indices& indices,
                                 const int& rotation,
-                                Tile &tile) {
+                                const Tile &tile) {
         int warp_id = tile.id;
         int pre_rotation = warp_id >> static_log<tile.size()/static_gcd<Array::size, tile.size()>::value>::value;
         src = rotate(src, pre_rotation);
@@ -529,7 +529,7 @@ struct r2c_compute_indices_impl {};
 template<typename Tile, typename Array>
 struct r2c_compute_indices_impl<Tile, Array, odd> {
 
-    __device__ static void impl(Array& indices, int& rotation, Tile &tile) {
+    __device__ static void impl(Array& indices, int& rotation, const Tile &tile) {
         indices =
             detail::r2c_compute_offsets<Tile, Array::size, odd>(tile);
         int warp_id = tile.id();
@@ -550,7 +550,7 @@ struct r2c_compute_indices_impl<Tile, Array, power_of_two> {
     static const int mod_n = n-1;
     static const int n_div_m = Tile::size() / m;
     static const int log_n_div_m = static_log<n_div_m>::value;
-    __device__ static void impl(Array& indices, int& rotation, Tile &tile) {
+    __device__ static void impl(Array& indices, int& rotation, const Tile &tile) {
         int warp_id = tile.id();
         int size = Array::size;
         rotation = warp_id % size;
@@ -565,7 +565,7 @@ template<typename Tile, typename Array>
 struct r2c_compute_indices_impl<Tile, Array, composite> {
     static const int size = Array::size;
     static const int c = static_gcd<size, Tile::size()>::value;
-    __device__ static void impl(Array& indices, int& rotation, Tile &tile) {
+    __device__ static void impl(Array& indices, int& rotation, const Tile &tile) {
         int warp_id = tile.id();
         rotation = size - (warp_id % size);
         int lb = (size * warp_id) & tile.mask();
@@ -585,7 +585,7 @@ struct r2c_warp_transpose_impl<Array, Indices, odd> {
     __device__ static void impl(Array& src,
                                 const Indices& indices,
                                 const int& rotation,
-                                Tile &tile) {
+                                const Tile &tile) {
         Array rotated = rotate(src, rotation);
         detail::warp_shuffle<Array, Indices>::impl(rotated, indices, tile);
         src = detail::r2c_tx_permute<Tile>(rotated);
@@ -598,7 +598,7 @@ struct r2c_warp_transpose_impl<Array, Indices, power_of_two> {
     __device__ static void impl(Array& src,
                                 const Indices& indices,
                                 const int& rotation,
-                                Tile &tile) {
+                                const Tile &tile) {
         Array rotated = rotate(src, rotation);
         detail::warp_shuffle<Array, Indices>::impl(rotated, indices, tile);
         const int size = Array::size;
@@ -615,7 +615,7 @@ struct r2c_warp_transpose_impl<Array, Indices, composite> {
     __device__ static void impl(Array& src,
                                 const Indices& indices,
                                 const int& rotation,
-                                Tile &tile) {
+                                const Tile &tile) {
         constexpr int c = static_gcd<Array::size, Tile::size()>::value;
         int warp_id = tile.id();
         src = composite_r2c_tx_permute(src);
@@ -628,7 +628,7 @@ struct r2c_warp_transpose_impl<Array, Indices, composite> {
 } //end namespace detail
 
 template<typename Tile, int i>
-__device__ void c2r_compute_indices(array<int, i>& indices, int& rotation, Tile &tile) {
+__device__ void c2r_compute_indices(array<int, i>& indices, int& rotation, const Tile &tile) {
     typedef array<int, i> Array;
     detail::c2r_compute_indices_impl<
         Array,
@@ -640,7 +640,7 @@ template<typename Tile, typename T, int i>
 __device__ void c2r_warp_transpose(array<T, i>& src,
                                    const array<int, i>& indices,
                                    int rotation,
-                                   Tile &tile) {
+                                   const Tile &tile) {
     typedef array<T, i> Array;
     detail::c2r_warp_transpose_impl<
         Array, array<int, i>,
@@ -649,7 +649,7 @@ __device__ void c2r_warp_transpose(array<T, i>& src,
 }
 
 template<typename Tile, typename T, int i>
-__device__ void c2r_warp_transpose(array<T, i>& src, Tile &tile) {
+__device__ void c2r_warp_transpose(array<T, i>& src, const Tile &tile) {
     typedef array<T, i> Array;
     typedef array<int, i> indices_array;
     indices_array indices;
@@ -663,7 +663,7 @@ __device__ void c2r_warp_transpose(array<T, i>& src, Tile &tile) {
 }
 
 template<typename Tile, int i>
-__device__ void r2c_compute_indices(array<int, i>& indices, int& rotation, Tile &tile) {
+__device__ void r2c_compute_indices(array<int, i>& indices, int& rotation, const Tile &tile) {
     typedef array<int, i> Array;
     detail::r2c_compute_indices_impl<
         Tile, Array, typename detail::tx_algorithm<i>::type>
@@ -674,7 +674,7 @@ template<typename Tile, typename T, int i>
 __device__ void r2c_warp_transpose(array<T, i>& src,
                                    const array<int, i>& indices,
                                    int rotation,
-                                   Tile &tile) {
+                                   const Tile &tile) {
     typedef array<T, i> Array;
     detail::r2c_warp_transpose_impl<
         Array, array<int, i>,
@@ -683,7 +683,7 @@ __device__ void r2c_warp_transpose(array<T, i>& src,
 }
 
 template<typename Tile, typename T, int i>
-__device__ void r2c_warp_transpose(array<T, i>& src, Tile &tile) {
+__device__ void r2c_warp_transpose(array<T, i>& src, const Tile &tile) {
     typedef array<T, i> Array;
     typedef array<int, i> indices_array;
     indices_array indices;
