@@ -28,7 +28,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 #include <trove/utility.h>
 #include <trove/rotate.h>
-#include <trove/shfl.h>
 #include <trove/static_mod_inverse.h>
 #include <trove/static_gcd.h>
 #include <trove/warp.h>

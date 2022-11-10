@@ -48,11 +48,7 @@ struct thread_block_tile {
   __device__ static constexpr auto size() { return decltype(tile)::num_threads(); }
   __device__ static constexpr auto log_size() { return log2(size()); }
   __device__ static constexpr auto mask() { return size() - 1; }
-
-  template <typename T> __device__ T shfl(const T& t, const int& i) const {
-    static_assert(sizeof(T) <= 16, "bork");
-    return tile.shfl(t, i);
-  }
+  template <typename T> __device__ T shfl(const T& t, const int& i) const { return tile.shfl(t, i); }
 
   __device__ auto id() const { return ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & mask(); }
 };
