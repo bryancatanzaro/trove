@@ -27,22 +27,77 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#define TROVE_CG
+
+#ifndef TROVE_CG
 namespace trove {
 
 enum {
-    WARP_SIZE = 32,
-    WARP_MASK = 0x1f,
-    WARP_CONVERGED = 0xFFFFFFFF,
-    LOG_WARP_SIZE = 5
+  WARP_SIZE = 32,
+  WARP_MASK = 0x1f,
+  WARP_CONVERGED = 0xFFFFFFFF,
+  LOG_WARP_SIZE = 5
 };
 
-__device__
-inline bool warp_converged() {
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
-    return (__activemask() == WARP_CONVERGED);
-#else
-    return (__ballot(true) == WARP_CONVERGED);
-#endif
 }
+
+#include <trove/shfl.h>
+
+#else
+
+enum {
+  WARP_SIZE = 32,
+  WARP_CONVERGED = 0xFFFFFFFF
+};
+
+#include <cooperative_groups.h>
+
+#endif
+
+namespace trove {
+
+#ifndef TROVE_CG // explicit shfl
+
+template <size_t threads>
+struct thread_block_tile {
+
+  __device__ thread_block_tile() {}
+
+  __device__ static constexpr auto size() { return WARP_SIZE; }
+  __device__ static constexpr auto log_size() { return LOG_WARP_SIZE; }
+  __device__ static constexpr auto mask() { return WARP_MASK; }
+
+  template <typename T> __device__ T shfl(const T& t, const int& i) const { return __shfl_sync(WARP_CONVERGED, t, i); }
+
+  __device__ auto id() const {  return ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK; }
+
+};
+
+#else // CG version
+
+__device__ constexpr size_t log2(size_t n) { return ( n < 2 ? 0 : 1 + log2(n / 2)); }
+
+namespace cg = cooperative_groups;
+
+template <size_t threads>
+struct thread_block_tile {
+  cg::thread_block_tile<threads> tile;
+  __device__ thread_block_tile() : tile(cg::tiled_partition<threads>(cg::this_thread_block())) { }
+
+  __device__ static constexpr auto size() { return decltype(tile)::num_threads(); }
+  __device__ static constexpr auto log_size() { return log2(size()); }
+  __device__ static constexpr auto mask() { return size() - 1; }
+
+  template <typename T> __device__ T shfl(const T& t, const int& i) const {
+    static_assert(sizeof(T) <= 16, "bork");
+    return tile.shfl(t, i);
+  }
+
+  __device__ auto id() const { return ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & mask(); }
+};
+
+#endif
+
+__device__ inline bool warp_converged() { return (__activemask() == WARP_CONVERGED); }
 
 }

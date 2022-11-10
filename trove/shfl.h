@@ -36,11 +36,7 @@ template<int s>
 struct shuffle {
     __device__
     static void impl(array<int, s>& d, const int& i) {
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
         d.head = __shfl_sync(WARP_CONVERGED, d.head, i);
-#else
-        d.head = __shfl(d.head, i);
-#endif
         shuffle<s-1>::impl(d.tail, i);
     }
 };
@@ -49,15 +45,10 @@ template<>
 struct shuffle<1> {
     __device__
     static void impl(array<int, 1>& d, const int& i) {
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
         d.head = __shfl_sync(WARP_CONVERGED, d.head, i);
-#else
-        d.head = __shfl(d.head, i);
-#endif
     }
 };
 
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
 template<int s>
 struct shuffle_sync {
     __device__
@@ -74,24 +65,10 @@ struct shuffle_sync<1> {
         d.head = __shfl_sync(mask, d.head, i);
     }
 };
-#endif
 
 }
 }
 
-template<typename T>
-__device__
-T __shfl(const T& t, const int& i) {
-    typedef trove::array<int,
-                         trove::detail::aliased_size<T, int>::value>
-        lysed_array;
-    lysed_array lysed = trove::detail::lyse<int>(t);
-    trove::detail::shuffle<lysed_array::size>
-      ::impl(lysed, i);
-    return trove::detail::fuse<T>(lysed);
-}
-
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
 template<typename T>
 __device__
 T __shfl_sync(unsigned mask, const T& t, const int& i) {
@@ -103,4 +80,3 @@ T __shfl_sync(unsigned mask, const T& t, const int& i) {
       ::impl(mask, lysed, i);
     return trove::detail::fuse<T>(lysed);
 }
-#endif

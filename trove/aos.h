@@ -62,206 +62,211 @@ struct use_direct {
 }
 
 
-template<typename T>
+template<typename T, typename Tile>
 __device__ typename enable_if<detail::use_shfl<T>::value, T>::type
-load_warp_contiguous(const T* src) {
-    int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
+load_warp_contiguous(const T* src, Tile &tile) {
+    int warp_id = tile.id();
     const T* warp_begin_src = src - warp_id;
     typedef typename detail::dismember_type<T>::type U;
     const U* as_int_src = (const U*)warp_begin_src;
     typedef array<U, detail::aliased_size<T, U>::value> int_store;
     int_store loaded = warp_load<int_store>(as_int_src, warp_id);
-    r2c_warp_transpose(loaded);
+    r2c_warp_transpose(loaded, tile);
     return detail::fuse<T>(loaded);
 }
 
-template<typename T>
+template<typename T, typename Tile>
 __device__ typename enable_if<detail::use_direct<T>::value, T>::type
-load_warp_contiguous(const T* src) {
+load_warp_contiguous(const T* src, Tile &) {
     return detail::divergent_load(src);
 }
 
-
 template<typename T>
+__device__ T load_warp_contiguous(const T* src) {
+    auto tile = thread_block_tile<32>();
+    return load_warp_contiguous(src, tile);
+}
+
+template<typename T, typename Tile>
 __device__ typename enable_if<detail::use_shfl<T>::value>::type
-store_warp_contiguous(const T& data, T* dest) {
-    int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
+store_warp_contiguous(const T& data, T* dest, Tile &tile) {
+    int warp_id = tile.id();
     T* warp_begin_dest = dest - warp_id;
     typedef typename detail::dismember_type<T>::type U;
     U* as_int_dest = (U*)warp_begin_dest;
     typedef array<U, detail::aliased_size<T, U>::value> int_store;
     int_store lysed = detail::lyse<U>(data);
-    c2r_warp_transpose(lysed);
+    c2r_warp_transpose(lysed, tile);
     warp_store(lysed, as_int_dest, warp_id);
 }
 
-template<typename T>
+template<typename T, typename Tile>
 __device__ typename enable_if<detail::use_direct<T>::value>::type
-store_warp_contiguous(const T& data, T* dest) {
+store_warp_contiguous(const T& data, T* dest, Tile &) {
     detail::divergent_store(data, dest);
 }
 
+template<typename T>
+__device__ void store_warp_contiguous(const T& data, T* dest) {
+    auto tile = thread_block_tile<32>();
+    store_warp_contiguous(data, dest, tile);
+}
 
 namespace detail {
 
-template<typename T>
+  template<typename T, typename Tile>
 __device__ typename detail::dismember_type<T>::type*
-compute_address(T* src, int div, int mod) {
+compute_address(T* src, int div, int mod, Tile &tile) {
     typedef typename detail::dismember_type<T>::type U;
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
-    T* base_ptr = __shfl_sync(WARP_CONVERGED, src, div);
-#else
-    T* base_ptr = __shfl(src, div);
-#endif
+    T* base_ptr = tile.shfl(src, div);
     U* result = ((U*)(base_ptr) + mod);
     return result;
 }
 
-template<typename T>
+template<typename Tile, typename T>
 struct address_constants {
     typedef typename detail::dismember_type<T>::type U;
     static const int m = aliased_size<T, U>::value;
-    static const int mod_offset = WARP_SIZE % m;
-    static const int div_offset = WARP_SIZE / m;
+    static const int mod_offset = Tile::size() % m;
+    static const int div_offset = Tile::size() / m;
 };
 
-template<typename T>
+template<typename Tile, typename T>
 __device__ void update_indices(int& div, int& mod) {
-    mod += address_constants<T>::mod_offset;
-    if (mod >= address_constants<T>::m) {
-        mod -= address_constants<T>::m;
+    mod += address_constants<Tile, T>::mod_offset;
+    if (mod >= address_constants<Tile, T>::m) {
+        mod -= address_constants<Tile, T>::m;
         div += 1;
     }
-    div += address_constants<T>::div_offset;
+    div += address_constants<Tile, T>::div_offset;
 }
-        
 
-template<int s, typename T>
+
+template<typename Tile, int s, typename T>
 struct indexed_load {
     typedef typename detail::dismember_type<T>::type U;
     __device__
-    static array<U, s> impl(const T* src, int div, int mod) {
+    static array<U, s> impl(const T* src, int div, int mod, Tile &tile) {
         U result;
-        U* address = compute_address(src, div, mod);
+        U* address = compute_address(src, div, mod, tile);
         result = *address;
-        update_indices<T>(div, mod);
-        
-        
+        update_indices<Tile, T>(div, mod);
+
+
         return array<U, s>(
             result,
-            indexed_load<s-1, T>::impl(src, div, mod));
+            indexed_load<Tile, s-1, T>::impl(src, div, mod, tile));
     }
 };
 
-template<typename T>
-struct indexed_load<1, T> {
+template<typename Tile, typename T>
+struct indexed_load<Tile, 1, T> {
     typedef typename detail::dismember_type<T>::type U;
     __device__
-    static array<U, 1> impl(const T* src, int div, int mod) {
+    static array<U, 1> impl(const T* src, int div, int mod, Tile &tile) {
         U result;
-        U* address = compute_address(src, div, mod);
+        U* address = compute_address(src, div, mod, tile);
         result = *address;
         return array<U, 1>(result);
     }
 };
 
-template<int s, typename T>
+template<typename Tile, int s, typename T>
 struct indexed_store {
     typedef typename detail::dismember_type<T>::type U;
     __device__
     static void impl(const array<U, s>& src,
-                     T* dest, int div, int mod) {
-        U* address = compute_address(dest, div, mod);
+                     T* dest, int div, int mod, Tile &tile) {
+      U* address = compute_address(dest, div, mod, tile);
         *address = src.head;
-        update_indices<T>(div, mod);
-        indexed_store<s-1, T>::impl(src.tail, dest, div, mod);
+        update_indices<Tile, T>(div, mod);
+        indexed_store<Tile, s-1, T>::impl(src.tail, dest, div, mod, tile);
     }
 };
 
-template<typename T>
-struct indexed_store<1, T> {
+template<typename Tile, typename T>
+struct indexed_store<Tile, 1, T> {
     typedef typename detail::dismember_type<T>::type U;
     __device__
     static void impl(const array<U, 1>& src,
-                     T* dest, int div, int mod) {
-        U* address = compute_address(dest, div, mod);
+                     T* dest, int div, int mod, Tile &tile) {
+        U* address = compute_address(dest, div, mod, tile);
         *address = src.head;
     }
 };
 
-template<typename T>
+template<typename T, typename Tile>
 __device__
-bool is_contiguous(int warp_id, const T* ptr) {
+bool is_contiguous(int warp_id, const T* ptr, Tile &tile) {
     int neighbor_idx = (warp_id == 0) ? 0 : warp_id-1;
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
-    const T* neighbor_ptr = __shfl_sync(WARP_CONVERGED, ptr, neighbor_idx);
-#else
-    const T* neighbor_ptr = __shfl(ptr, neighbor_idx);
-#endif
+    const T* neighbor_ptr = tile.shfl(ptr, neighbor_idx);
     bool neighbor_contiguous = (warp_id == 0) ? true : (ptr - neighbor_ptr == sizeof(T));
     bool result = __all(neighbor_contiguous);
     return result;
 }
 
-template<typename T>
+template<typename T, typename Tile>
 __device__ typename enable_if<use_shfl<T>::value, T>::type
-load_dispatch(const T* src) {
-    int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
+load_dispatch(const T* src, Tile &tile) {
+    int warp_id = tile.id();
     // if (detail::is_contiguous(warp_id, src)) {
     //     return detail::load_warp_contiguous(src);
     // } else {
         typedef typename detail::dismember_type<T>::type U;
         typedef array<U, detail::aliased_size<T, U>::value> u_store;
         u_store loaded =
-            detail::indexed_load<detail::aliased_size<T, U>::value, T>::impl(
+            detail::indexed_load<Tile, detail::aliased_size<T, U>::value, T>::impl(
                 src,
-                warp_id / address_constants<T>::m,
-                warp_id % address_constants<T>::m);
-        r2c_warp_transpose(loaded);
+                warp_id / address_constants<Tile, T>::m,
+                warp_id % address_constants<Tile, T>::m,
+                tile);
+        r2c_warp_transpose(loaded, tile);
         return detail::fuse<T>(loaded);
-    // }   
+    // }
 }
 
 
 
-template<typename T>
+  template<typename T, typename Tile>
 __device__ typename enable_if<use_direct<T>::value, T>::type
-load_dispatch(const T* src) {
+  load_dispatch(const T* src, Tile &) {
     return detail::divergent_load(src);
 }
 
 
-template<typename T>
+  template<typename T, typename Tile>
 __device__ typename enable_if<use_shfl<T>::value>::type
-store_dispatch(const T& data, T* dest) {
-    int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
+store_dispatch(const T& data, T* dest, Tile &tile) {
+    int warp_id = tile.id();
     // if (detail::is_contiguous(warp_id, dest)) {
     //     detail::store_warp_contiguous(data, dest);
     // } else {
         typedef typename detail::dismember_type<T>::type U;
         typedef array<U, detail::aliased_size<T, U>::value> u_store;
         u_store lysed = detail::lyse<U>(data);
-        c2r_warp_transpose(lysed);
-        detail::indexed_store<detail::aliased_size<T, U>::value, T>::impl(
+        c2r_warp_transpose(lysed, tile);
+        detail::indexed_store<Tile, detail::aliased_size<T, U>::value, T>::impl(
             lysed, dest,
-            warp_id / address_constants<T>::m,
-            warp_id % address_constants<T>::m);
+            warp_id / address_constants<Tile, T>::m,
+            warp_id % address_constants<Tile, T>::m,
+            tile);
     // }
 }
 
-template<typename T>
+  template<typename T, typename Tile>
 __device__ typename enable_if<use_direct<T>::value>::type
-store_dispatch(const T& data, T* dest) {
+store_dispatch(const T& data, T* dest, Tile &) {
     detail::divergent_store(data, dest);
 }
 
-  
+
 }
 
 template<typename T>
 __device__ T load(const T* src) {
     if (warp_converged()) {
-        return detail::load_dispatch(src);
+        thread_block_tile<WARP_SIZE> tile;
+        return detail::load_dispatch(src, tile);
     } else {
         return detail::divergent_load(src);
     }
@@ -270,7 +275,8 @@ __device__ T load(const T* src) {
 template<typename T>
 __device__ void store(const T& data, T* dest) {
     if (warp_converged()) {
-        detail::store_dispatch(data, dest);
+        thread_block_tile<WARP_SIZE> tile;
+        detail::store_dispatch(data, dest, tile);
     } else {
         detail::divergent_store(data, dest);
     }
