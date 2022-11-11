@@ -58,36 +58,25 @@ __device__ inline bool warp_converged() { return (__activemask() == WARP_CONVERG
 __device__ inline bool half_warp_converged()
 {
   auto lane_id = threadIdx.x & 31;
-  auto mask = __activemask();
-  auto first = lane_id < 16 && ((mask & 0x0000FFFF) == 0x0000FFFF);
-  auto second = lane_id >= 16 && ((mask & 0xFFFF0000) == 0xFFFF0000);
-  return first || second;
+  auto shift = lane_id & ~0xe;
+  auto lane_mask = 65535 << shift;
+  return (__activemask() & lane_mask) == lane_mask;
 }
 
 __device__ inline bool quarter_warp_converged()
 {
   auto lane_id = threadIdx.x & 31;
-  auto mask = __activemask();
-  auto first =                   (lane_id < 8) && ((mask & 0x000000FF) == 0x000000FF);
-  auto second =  (lane_id >=8 && lane_id < 16) && ((mask & 0x0000FF00) == 0x0000FF00);
-  auto third = (lane_id >= 16 && lane_id < 24) && ((mask & 0x00FF0000) == 0x00FF0000);
-  auto fourth =                 (lane_id >=24) && ((mask & 0xFF000000) == 0xFF000000);
-  return first || second || third || fourth;
+  auto shift = lane_id & ~0x7;
+  auto lane_mask = 255 << shift;
+  return (__activemask() & lane_mask) == lane_mask;
 }
 
 __device__ inline bool eighth_warp_converged()
 {
   auto lane_id = threadIdx.x & 31;
-  auto mask = __activemask();
-  auto first =                    (lane_id <  4) && ((mask & 0x0000000F) == 0x0000000F);
-  auto second =   (lane_id >= 4 && lane_id <  8) && ((mask & 0x000000F0) == 0x000000F0);
-  auto third =   (lane_id >=  8 && lane_id < 12) && ((mask & 0x00000F00) == 0x00000F00);
-  auto fourth =  (lane_id >= 12 && lane_id < 16) && ((mask & 0x0000F000) == 0x0000F000);
-  auto fifth =   (lane_id >= 16 && lane_id < 20) && ((mask & 0x000F0000) == 0x000F0000);
-  auto sixth =   (lane_id >= 20 && lane_id < 24) && ((mask & 0x00F00000) == 0x00F00000);
-  auto seventh = (lane_id >= 24 && lane_id < 28) && ((mask & 0x0F000000) == 0x0F000000);
-  auto eighth =                   (lane_id >=28) && ((mask & 0xF0000000) == 0xF0000000);
-  return first || second || third || fourth || fifth || sixth || seventh || eighth;
+  auto shift = lane_id & ~0x3;
+  auto lane_mask = 15 << shift;
+  return (__activemask() & lane_mask) == lane_mask;
 }
 
 }

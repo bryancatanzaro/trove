@@ -260,7 +260,7 @@ __device__ T load(const T* src) {
         return detail::load_dispatch(src, thread_block_tile<WARP_SIZE/2>());
     } else if (quarter_warp_converged()) {
         return detail::load_dispatch(src, thread_block_tile<WARP_SIZE/4>());
-    } else if (eighth_warp_converged_v2()) {
+    } else if (eighth_warp_converged()) {
         return detail::load_dispatch(src, thread_block_tile<WARP_SIZE/8>());
     } else {
         return detail::divergent_load(src);
@@ -275,7 +275,7 @@ __device__ void store(const T& data, T* dest) {
         detail::store_dispatch(data, dest, thread_block_tile<WARP_SIZE/2>());
     } else if (quarter_warp_converged()) {
         detail::store_dispatch(data, dest, thread_block_tile<WARP_SIZE/4>());
-    } else if (eighth_warp_converged_v2()) {
+    } else if (eighth_warp_converged()) {
         detail::store_dispatch(data, dest, thread_block_tile<WARP_SIZE/8>());
     } else {
         detail::divergent_store(data, dest);
