@@ -57,7 +57,7 @@ __device__ inline bool warp_converged() { return (__activemask() == WARP_CONVERG
 
 __device__ inline bool half_warp_converged()
 {
-  auto lane_id = threadIdx.x & 31;
+  auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
   auto shift = lane_id & ~0xe;
   auto lane_mask = 65535 << shift;
   return (__activemask() & lane_mask) == lane_mask;
@@ -65,7 +65,7 @@ __device__ inline bool half_warp_converged()
 
 __device__ inline bool quarter_warp_converged()
 {
-  auto lane_id = threadIdx.x & 31;
+  auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
   auto shift = lane_id & ~0x7;
   auto lane_mask = 255 << shift;
   return (__activemask() & lane_mask) == lane_mask;
@@ -73,7 +73,7 @@ __device__ inline bool quarter_warp_converged()
 
 __device__ inline bool eighth_warp_converged()
 {
-  auto lane_id = threadIdx.x & 31;
+  auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
   auto shift = lane_id & ~0x3;
   auto lane_mask = 15 << shift;
   return (__activemask() & lane_mask) == lane_mask;
