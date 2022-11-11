@@ -41,9 +41,9 @@ __device__ constexpr size_t log2(size_t n) { return ( n < 2 ? 0 : 1 + log2(n / 2
 namespace cg = cooperative_groups;
 
 template <size_t threads>
-struct thread_block_tile {
+struct thread_tile {
   cg::thread_block_tile<threads> tile;
-  __device__ thread_block_tile() : tile(cg::tiled_partition<threads>(cg::this_thread_block())) { }
+  __device__ thread_tile() : tile(cg::tiled_partition<threads>(cg::this_thread_block())) { }
 
   template <typename T> __device__ T shfl(const T& t, const int& i) const { return tile.shfl(t, i); }
 
