@@ -27,14 +27,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <cooperative_groups.h>
+
+namespace trove {
+
 enum {
   WARP_SIZE = 32,
   WARP_CONVERGED = 0xFFFFFFFF
 };
-
-#include <cooperative_groups.h>
-
-namespace trove {
 
 __device__ constexpr size_t log2(size_t n) { return ( n < 2 ? 0 : 1 + log2(n / 2)); }
 
@@ -45,14 +45,49 @@ struct thread_block_tile {
   cg::thread_block_tile<threads> tile;
   __device__ thread_block_tile() : tile(cg::tiled_partition<threads>(cg::this_thread_block())) { }
 
+  template <typename T> __device__ T shfl(const T& t, const int& i) const { return tile.shfl(t, i); }
+
   __device__ static constexpr auto size() { return decltype(tile)::num_threads(); }
   __device__ static constexpr auto log_size() { return log2(size()); }
   __device__ static constexpr auto mask() { return size() - 1; }
-  template <typename T> __device__ T shfl(const T& t, const int& i) const { return tile.shfl(t, i); }
-
-  __device__ auto id() const { return ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & mask(); }
+  __device__ auto id() const { return tile.thread_rank(); }
 };
 
 __device__ inline bool warp_converged() { return (__activemask() == WARP_CONVERGED); }
+
+__device__ inline bool half_warp_converged()
+{
+  auto lane_id = threadIdx.x & 31;
+  auto mask = __activemask();
+  auto first = lane_id < 16 && ((mask & 0x0000FFFF) == 0x0000FFFF);
+  auto second = lane_id >= 16 && ((mask & 0xFFFF0000) == 0xFFFF0000);
+  return first || second;
+}
+
+__device__ inline bool quarter_warp_converged()
+{
+  auto lane_id = threadIdx.x & 31;
+  auto mask = __activemask();
+  auto first =                   (lane_id < 8) && ((mask & 0x000000FF) == 0x000000FF);
+  auto second =  (lane_id >=8 && lane_id < 16) && ((mask & 0x0000FF00) == 0x0000FF00);
+  auto third = (lane_id >= 16 && lane_id < 24) && ((mask & 0x00FF0000) == 0x00FF0000);
+  auto fourth =                 (lane_id >=24) && ((mask & 0xFF000000) == 0xFF000000);
+  return first || second || third || fourth;
+}
+
+__device__ inline bool eighth_warp_converged()
+{
+  auto lane_id = threadIdx.x & 31;
+  auto mask = __activemask();
+  auto first =                    (lane_id <  4) && ((mask & 0x0000000F) == 0x0000000F);
+  auto second =   (lane_id >= 4 && lane_id <  8) && ((mask & 0x000000F0) == 0x000000F0);
+  auto third =   (lane_id >=  8 && lane_id < 12) && ((mask & 0x00000F00) == 0x00000F00);
+  auto fourth =  (lane_id >= 12 && lane_id < 16) && ((mask & 0x0000F000) == 0x0000F000);
+  auto fifth =   (lane_id >= 16 && lane_id < 20) && ((mask & 0x000F0000) == 0x000F0000);
+  auto sixth =   (lane_id >= 20 && lane_id < 24) && ((mask & 0x00F00000) == 0x00F00000);
+  auto seventh = (lane_id >= 24 && lane_id < 28) && ((mask & 0x0F000000) == 0x0F000000);
+  auto eighth =                   (lane_id >=28) && ((mask & 0xF0000000) == 0xF0000000);
+  return first || second || third || fourth || fifth || sixth || seventh || eighth;
+}
 
 }

@@ -46,9 +46,8 @@ struct coalesced_ref {
 
     __device__ coalesced_ref& operator=(const coalesced_ref& other) {
         if (warp_converged()) {
-            thread_block_tile<WARP_SIZE> tile;
-            T data = detail::load_dispatch(other.m_ptr, tile);
-            detail::store_dispatch(data, m_ptr, tile);
+            T data = detail::load_dispatch(other.m_ptr);
+            detail::store_dispatch(data, m_ptr);
         } else {
             T data = detail::divergent_load(other.m_ptr);
             detail::divergent_store(data, m_ptr);

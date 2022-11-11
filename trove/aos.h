@@ -219,7 +219,7 @@ load_dispatch(const T* src, const Tile &tile) {
 
   template<typename T, typename Tile>
 __device__ typename enable_if<use_direct<T>::value, T>::type
-  load_dispatch(const T* src, Tile &) {
+  load_dispatch(const T* src, const Tile &) {
     return detail::divergent_load(src);
 }
 
@@ -245,7 +245,7 @@ store_dispatch(const T& data, T* dest, const Tile &tile) {
 
   template<typename T, typename Tile>
 __device__ typename enable_if<use_direct<T>::value>::type
-store_dispatch(const T& data, T* dest, Tile &) {
+store_dispatch(const T& data, T* dest, const Tile &) {
     detail::divergent_store(data, dest);
 }
 
@@ -255,8 +255,13 @@ store_dispatch(const T& data, T* dest, Tile &) {
 template<typename T>
 __device__ T load(const T* src) {
     if (warp_converged()) {
-        thread_block_tile<WARP_SIZE> tile;
-        return detail::load_dispatch(src, tile);
+        return detail::load_dispatch(src, thread_block_tile<WARP_SIZE>());
+    } else if (half_warp_converged()) {
+        return detail::load_dispatch(src, thread_block_tile<WARP_SIZE/2>());
+    } else if (quarter_warp_converged()) {
+        return detail::load_dispatch(src, thread_block_tile<WARP_SIZE/4>());
+    } else if (eighth_warp_converged_v2()) {
+        return detail::load_dispatch(src, thread_block_tile<WARP_SIZE/8>());
     } else {
         return detail::divergent_load(src);
     }
@@ -265,8 +270,13 @@ __device__ T load(const T* src) {
 template<typename T>
 __device__ void store(const T& data, T* dest) {
     if (warp_converged()) {
-        thread_block_tile<WARP_SIZE> tile;
-        detail::store_dispatch(data, dest, tile);
+        detail::store_dispatch(data, dest, thread_block_tile<WARP_SIZE>());
+    } else if (half_warp_converged()) {
+        detail::store_dispatch(data, dest, thread_block_tile<WARP_SIZE/2>());
+    } else if (quarter_warp_converged()) {
+        detail::store_dispatch(data, dest, thread_block_tile<WARP_SIZE/4>());
+    } else if (eighth_warp_converged_v2()) {
+        detail::store_dispatch(data, dest, thread_block_tile<WARP_SIZE/8>());
     } else {
         detail::divergent_store(data, dest);
     }
