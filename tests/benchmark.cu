@@ -44,6 +44,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace trove;
 
+// tile size to use for low-level load/store warp contiguous
+#ifndef TILE_SIZE
+#define TILE_SIZE 32
+#endif
+
 template<typename T>
 __global__ void
 benchmark_contiguous_shfl_store(T* r) {
@@ -52,7 +57,7 @@ benchmark_contiguous_shfl_store(T* r) {
     int size = detail::aliased_size<T, int>::value;
     data = counting_array<T>::impl(
         global_index * size);
-    store_warp_contiguous(data, r + global_index);    
+    store_warp_contiguous<TILE_SIZE>(data, r + global_index);
 }
 
 template<typename T>
@@ -70,7 +75,7 @@ template<typename T>
 __global__ void
 benchmark_contiguous_shfl_load(T* s, typename T::value_type* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
-    T data = load_warp_contiguous(s + global_index);
+    T data = load_warp_contiguous<TILE_SIZE>(s + global_index);
     r[global_index] = sum(data);
 }
 

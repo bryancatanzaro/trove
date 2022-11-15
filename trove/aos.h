@@ -62,9 +62,10 @@ struct use_direct {
 }
 
 
-template<typename T, typename Tile = thread_tile<WARP_SIZE>>
+template<size_t tile_size = WARP_SIZE, typename T>
 __device__ typename enable_if<detail::use_shfl<T>::value, T>::type
-load_warp_contiguous(const T* src, const Tile &tile = Tile()) {
+load_warp_contiguous(const T* src) {
+    thread_tile<tile_size> tile;
     int warp_id = tile.id();
     const T* warp_begin_src = src - warp_id;
     typedef typename detail::dismember_type<T>::type U;
@@ -75,16 +76,17 @@ load_warp_contiguous(const T* src, const Tile &tile = Tile()) {
     return detail::fuse<T>(loaded);
 }
 
-template<typename T, typename Tile = thread_tile<WARP_SIZE>>
+template<size_t tile_size = WARP_SIZE, typename T>
 __device__ typename enable_if<detail::use_direct<T>::value, T>::type
-load_warp_contiguous(const T* src, const Tile & = Tile()) {
+load_warp_contiguous(const T* src) {
     return detail::divergent_load(src);
 }
 
 
-template<typename T, typename Tile = thread_tile<WARP_SIZE>>
+template<size_t tile_size = WARP_SIZE, typename T>
 __device__ typename enable_if<detail::use_shfl<T>::value>::type
-store_warp_contiguous(const T& data, T* dest, const Tile &tile = Tile()) {
+store_warp_contiguous(const T& data, T* dest) {
+    thread_tile<tile_size> tile;
     int warp_id = tile.id();
     T* warp_begin_dest = dest - warp_id;
     typedef typename detail::dismember_type<T>::type U;
@@ -95,9 +97,9 @@ store_warp_contiguous(const T& data, T* dest, const Tile &tile = Tile()) {
     warp_store(lysed, as_int_dest, warp_id, tile.size());
 }
 
-template<typename T, typename Tile = thread_tile<WARP_SIZE>>
+template<size_t tile_size = WARP_SIZE, typename T>
 __device__ typename enable_if<detail::use_direct<T>::value>::type
-store_warp_contiguous(const T& data, T* dest, const Tile & = Tile()) {
+store_warp_contiguous(const T& data, T* dest) {
     detail::divergent_store(data, dest);
 }
 
