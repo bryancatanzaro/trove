@@ -256,11 +256,11 @@ template<typename T>
 __device__ T load(const T* src) {
     if (warp_converged()) {
         return detail::load_dispatch(src, thread_tile<WARP_SIZE>());
-    } else if (half_warp_converged()) {
+    } else if (warp_converged<WARP_SIZE/2>()) {
         return detail::load_dispatch(src, thread_tile<WARP_SIZE/2>());
-    } else if (quarter_warp_converged()) {
+    } else if (warp_converged<WARP_SIZE/4>()) {
         return detail::load_dispatch(src, thread_tile<WARP_SIZE/4>());
-    } else if (eighth_warp_converged()) {
+    } else if (warp_converged<WARP_SIZE/8>()) {
         return detail::load_dispatch(src, thread_tile<WARP_SIZE/8>());
     } else {
         return detail::divergent_load(src);
@@ -271,11 +271,11 @@ template<typename T>
 __device__ void store(const T& data, T* dest) {
     if (warp_converged()) {
         detail::store_dispatch(data, dest, thread_tile<WARP_SIZE>());
-    } else if (half_warp_converged()) {
+    } else if (warp_converged<WARP_SIZE/2>()) {
         detail::store_dispatch(data, dest, thread_tile<WARP_SIZE/2>());
-    } else if (quarter_warp_converged()) {
+    } else if (warp_converged<WARP_SIZE/4>()) {
         detail::store_dispatch(data, dest, thread_tile<WARP_SIZE/4>());
-    } else if (eighth_warp_converged()) {
+    } else if (warp_converged<WARP_SIZE/8>()) {
         detail::store_dispatch(data, dest, thread_tile<WARP_SIZE/8>());
     } else {
         detail::divergent_store(data, dest);
