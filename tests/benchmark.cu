@@ -344,7 +344,7 @@ template<template<int> class F>
 struct do_tests<F, null_type> {
     static void impl() {}
     template<typename T>
-    static void impl(const T& t) {}
+    static void impl(const T&) {}
 };
 
 #ifndef LOWER_BOUND

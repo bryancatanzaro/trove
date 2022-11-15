@@ -60,7 +60,7 @@ template <>
 __device__ inline bool warp_converged<16>()
 {
   auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
-  auto shift = lane_id & ~0xe;
+  auto shift = lane_id & ~0xf;
   auto lane_mask = 65535 << shift;
   return (__activemask() & lane_mask) == lane_mask;
 }
