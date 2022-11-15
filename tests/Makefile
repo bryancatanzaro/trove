@@ -12,3 +12,6 @@ benchmark: benchmark.cu
 
 block: block.cu
 	$(NVCC) -arch=$(ARCH) -I../ -Xptxas -v block.cu -o block
+
+clean:
+	rm -f *.o benchmark block
