@@ -48,6 +48,18 @@ struct coalesced_ref {
         if (warp_converged()) {
             T data = detail::load_dispatch(other.m_ptr);
             detail::store_dispatch(data, m_ptr);
+        } else if (half_warp_converged()) {
+            auto tile = thread_tile<WARP_SIZE/2>();
+            T data = detail::load_dispatch(other.m_ptr, tile);
+            detail::store_dispatch(data, m_ptr, tile);
+        } else if (quarter_warp_converged()) {
+            auto tile = thread_tile<WARP_SIZE/4>();
+            T data = detail::load_dispatch(other.m_ptr, tile);
+            detail::store_dispatch(data, m_ptr, tile);
+        } else if (eighth_warp_converged()) {
+            auto tile = thread_tile<WARP_SIZE/8>();
+            T data = detail::load_dispatch(other.m_ptr, tile);
+            detail::store_dispatch(data, m_ptr, tile);
         } else {
             T data = detail::divergent_load(other.m_ptr);
             detail::divergent_store(data, m_ptr);

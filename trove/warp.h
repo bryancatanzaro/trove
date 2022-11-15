@@ -27,22 +27,56 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <cooperative_groups.h>
+
 namespace trove {
 
 enum {
-    WARP_SIZE = 32,
-    WARP_MASK = 0x1f,
-    WARP_CONVERGED = 0xFFFFFFFF,
-    LOG_WARP_SIZE = 5
+  WARP_SIZE = 32,
+  WARP_CONVERGED = 0xFFFFFFFF
 };
 
-__device__
-inline bool warp_converged() {
-#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
-    return (__activemask() == WARP_CONVERGED);
-#else
-    return (__ballot(true) == WARP_CONVERGED);
-#endif
+__device__ constexpr size_t log2(size_t n) { return ( n < 2 ? 0 : 1 + log2(n / 2)); }
+
+namespace cg = cooperative_groups;
+
+template <size_t threads>
+struct thread_tile {
+  cg::thread_block_tile<threads> tile;
+  __device__ thread_tile() : tile(cg::tiled_partition<threads>(cg::this_thread_block())) { }
+
+  template <typename T> __device__ T shfl(const T& t, const int& i) const { return tile.shfl(t, i); }
+
+  __device__ static constexpr auto size() { return decltype(tile)::num_threads(); }
+  __device__ static constexpr auto log_size() { return log2(size()); }
+  __device__ static constexpr auto mask() { return size() - 1; }
+  __device__ auto id() const { return tile.thread_rank(); }
+};
+
+__device__ inline bool warp_converged() { return (__activemask() == WARP_CONVERGED); }
+
+__device__ inline bool half_warp_converged()
+{
+  auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
+  auto shift = lane_id & ~0xe;
+  auto lane_mask = 65535 << shift;
+  return (__activemask() & lane_mask) == lane_mask;
+}
+
+__device__ inline bool quarter_warp_converged()
+{
+  auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
+  auto shift = lane_id & ~0x7;
+  auto lane_mask = 255 << shift;
+  return (__activemask() & lane_mask) == lane_mask;
+}
+
+__device__ inline bool eighth_warp_converged()
+{
+  auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
+  auto shift = lane_id & ~0x3;
+  auto lane_mask = 15 << shift;
+  return (__activemask() & lane_mask) == lane_mask;
 }
 
 }
