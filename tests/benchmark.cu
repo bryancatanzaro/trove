@@ -130,7 +130,7 @@ void run_benchmark_contiguous_store(const std::string name, void (*test)(array<i
     std::cout << name << ", " << i << ", ";
     int n_blocks = 80 * 8 * 100;
     int block_size = 256;
-    int n = n_blocks * block_size - 100;
+    int n = n_blocks * block_size;
     thrust::device_vector<T> r(n);
     int iterations = 10;
     cuda_timer timer;
