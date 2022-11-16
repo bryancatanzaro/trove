@@ -37,33 +37,34 @@ namespace trove {
 
 namespace detail {
 
-template<typename T>
+template<typename T, size_t tile_size>
 struct size_in_range {
     typedef typename dismember_type<T>::type U;
     static const int size = aliased_size<T, U>::value;
-    static const bool value = (size > 1) && (size < 64);
+    // at present, maximum struct size is dictated by the tile_size
+    static const bool value = (size > 1) && (size <= tile_size);
 };
 
-template<typename T, bool s=size_multiple_power_of_two<T, 2>::value, bool r=size_in_range<T>::value>
+template<typename T, size_t tile_size, bool s=size_multiple_power_of_two<T, 2>::value, bool r=size_in_range<T, tile_size>::value>
 struct use_shfl {
     static const bool value = false;
 };
 
-template<typename T>
-struct use_shfl<T, true, true> {
+template<typename T, size_t tile_size>
+struct use_shfl<T, tile_size, true, true> {
     static const bool value = true;
 };
 
-template<typename T>
+template<typename T, size_t tile_size>
 struct use_direct {
-    static const bool value = !(use_shfl<T>::value);
+    static const bool value = !(use_shfl<T, tile_size>::value);
 };
 
 }
 
 
 template<size_t tile_size = WARP_SIZE, typename T>
-__device__ typename enable_if<detail::use_shfl<T>::value, T>::type
+__device__ typename enable_if<detail::use_shfl<T, tile_size>::value, T>::type
 load_warp_contiguous(const T* src) {
     thread_tile<tile_size> tile;
     int warp_id = tile.id();
@@ -77,14 +78,14 @@ load_warp_contiguous(const T* src) {
 }
 
 template<size_t tile_size = WARP_SIZE, typename T>
-__device__ typename enable_if<detail::use_direct<T>::value, T>::type
+__device__ typename enable_if<detail::use_direct<T, tile_size>::value, T>::type
 load_warp_contiguous(const T* src) {
     return detail::divergent_load(src);
 }
 
 
 template<size_t tile_size = WARP_SIZE, typename T>
-__device__ typename enable_if<detail::use_shfl<T>::value>::type
+__device__ typename enable_if<detail::use_shfl<T, tile_size>::value>::type
 store_warp_contiguous(const T& data, T* dest) {
     thread_tile<tile_size> tile;
     int warp_id = tile.id();
@@ -98,7 +99,7 @@ store_warp_contiguous(const T& data, T* dest) {
 }
 
 template<size_t tile_size = WARP_SIZE, typename T>
-__device__ typename enable_if<detail::use_direct<T>::value>::type
+__device__ typename enable_if<detail::use_direct<T, tile_size>::value>::type
 store_warp_contiguous(const T& data, T* dest) {
     detail::divergent_store(data, dest);
 }
@@ -198,7 +199,7 @@ bool is_contiguous(int warp_id, const T* ptr, const Tile &tile) {
 }
 
 template<typename T, typename Tile>
-__device__ typename enable_if<use_shfl<T>::value, T>::type
+__device__ typename enable_if<use_shfl<T, Tile::size()>::value, T>::type
 load_dispatch(const T* src, const Tile &tile) {
     int warp_id = tile.id();
     // if (detail::is_contiguous(warp_id, src)) {
@@ -219,15 +220,15 @@ load_dispatch(const T* src, const Tile &tile) {
 
 
 
-  template<typename T, typename Tile>
-__device__ typename enable_if<use_direct<T>::value, T>::type
+template<typename T, typename Tile>
+__device__ typename enable_if<use_direct<T, Tile::size()>::value, T>::type
   load_dispatch(const T* src, const Tile &) {
     return detail::divergent_load(src);
 }
 
 
-  template<typename T, typename Tile>
-__device__ typename enable_if<use_shfl<T>::value>::type
+template<typename T, typename Tile>
+__device__ typename enable_if<use_shfl<T, Tile::size()>::value>::type
 store_dispatch(const T& data, T* dest, const Tile &tile) {
     int warp_id = tile.id();
     // if (detail::is_contiguous(warp_id, dest)) {
@@ -245,8 +246,8 @@ store_dispatch(const T& data, T* dest, const Tile &tile) {
     // }
 }
 
-  template<typename T, typename Tile>
-__device__ typename enable_if<use_direct<T>::value>::type
+template<typename T, typename Tile>
+__device__ typename enable_if<use_direct<T, Tile::size()>::value>::type
 store_dispatch(const T& data, T* dest, const Tile &) {
     detail::divergent_store(data, dest);
 }
