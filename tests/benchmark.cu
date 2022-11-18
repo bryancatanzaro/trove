@@ -44,6 +44,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace trove;
 
+// tile size to use for low-level load/store warp contiguous
+#ifndef TILE_SIZE
+#define TILE_SIZE 32
+#endif
+
 template<typename T>
 __global__ void
 benchmark_contiguous_shfl_store(T* r) {
@@ -52,7 +57,7 @@ benchmark_contiguous_shfl_store(T* r) {
     int size = detail::aliased_size<T, int>::value;
     data = counting_array<T>::impl(
         global_index * size);
-    store_warp_contiguous(data, r + global_index);    
+    store_warp_contiguous<TILE_SIZE>(data, r + global_index);
 }
 
 template<typename T>
@@ -70,7 +75,7 @@ template<typename T>
 __global__ void
 benchmark_contiguous_shfl_load(T* s, typename T::value_type* r) {
     int global_index = threadIdx.x + blockDim.x * blockIdx.x;
-    T data = load_warp_contiguous(s + global_index);
+    T data = load_warp_contiguous<TILE_SIZE>(s + global_index);
     r[global_index] = sum(data);
 }
 
@@ -130,7 +135,7 @@ void run_benchmark_contiguous_store(const std::string name, void (*test)(array<i
     std::cout << name << ", " << i << ", ";
     int n_blocks = 80 * 8 * 100;
     int block_size = 256;
-    int n = n_blocks * block_size - 100;
+    int n = n_blocks * block_size;
     thrust::device_vector<T> r(n);
     int iterations = 10;
     cuda_timer timer;
@@ -339,7 +344,7 @@ template<template<int> class F>
 struct do_tests<F, null_type> {
     static void impl() {}
     template<typename T>
-    static void impl(const T& t) {}
+    static void impl(const T&) {}
 };
 
 #ifndef LOWER_BOUND

@@ -127,88 +127,21 @@ T get(const array<T, m>& src) {
 
 template<typename T>
 __host__ __device__
-array<T, 0> make_array() {
+auto make_array() {
     return array<T, 0>();
 }
 
 template<typename T>
 __host__ __device__
-array<T, 1> make_array(T a0) {
+auto make_array(T a0) {
     return array<T, 1>(a0);
 }
 
-template<typename T>
+template <typename T, typename... Args>
 __host__ __device__
-array<T, 2> make_array(T a0, T a1) {
-    return array<T, 2>(a0,
-                       make_array<T>(a1));
+auto make_array(T a0, Args... args) {
+    return array<T, 1 + sizeof...(Args)>(a0, make_array<T>(args...));
 }
-
-template<typename T>
-__host__ __device__
-array<T, 3> make_array(T a0, T a1, T a2) {
-    return array<T, 3>(a0,
-                       make_array<T>(a1, a2));
-}
-
-template<typename T>
-__host__ __device__
-array<T, 4> make_array(T a0, T a1, T a2, T a3) {
-    return array<T, 4>(a0,
-                       make_array<T>(a1, a2, a3));
-}
-
-template<typename T>
-__host__ __device__
-array<T, 5> make_array(T a0, T a1, T a2, T a3, T a4) {
-    return array<T, 5>(a0,
-                       make_array<T>(a1, a2, a3, a4));
-}
-
-template<typename T>
-__host__ __device__
-array<T, 6> make_array(T a0, T a1, T a2, T a3, T a4,
-                       T a5) {
-    return array<T, 6>(a0,
-                       make_array<T>(a1, a2, a3, a4, a5));
-}
-
-template<typename T>
-__host__ __device__
-array<T, 7> make_array(T a0, T a1, T a2, T a3, T a4,
-                       T a5, T a6) {
-    return array<T, 7>(a0,
-                       make_array<T>(a1, a2, a3, a4, a5,
-                                     a6));
-}
-
-template<typename T>
-__host__ __device__
-array<T, 8> make_array(T a0, T a1, T a2, T a3, T a4,
-                       T a5, T a6, T a7) {
-    return array<T, 8>(a0,
-                       make_array<T>(a1, a2, a3, a4, a5,
-                                     a6, a7));
-}
-
-template<typename T>
-__host__ __device__
-array<T, 9> make_array(T a0, T a1, T a2, T a3, T a4,
-                       T a5, T a6, T a7, T a8) {
-    return array<T, 9>(a0,
-                       make_array<T>(a1, a2, a3, a4, a5,
-                                     a6, a7, a8));
-}
-
-template<typename T>
-__host__ __device__
-array<T, 10> make_array(T a0, T a1, T a2, T a3, T a4,
-                        T a5, T a6, T a7, T a8, T a9) {
-    return array<T, 10>(a0,
-                        make_array<T>(a1, a2, a3, a4, a5,
-                                      a6, a7, a8, a9));
-}
-
 
 namespace detail {
 

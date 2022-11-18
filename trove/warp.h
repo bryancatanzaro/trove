@@ -53,17 +53,20 @@ struct thread_tile {
   __device__ auto id() const { return tile.thread_rank(); }
 };
 
+template <size_t warp_size = WARP_SIZE>
 __device__ inline bool warp_converged() { return (__activemask() == WARP_CONVERGED); }
 
-__device__ inline bool half_warp_converged()
+template <>
+__device__ inline bool warp_converged<16>()
 {
   auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
-  auto shift = lane_id & ~0xe;
+  auto shift = lane_id & ~0xf;
   auto lane_mask = 65535 << shift;
   return (__activemask() & lane_mask) == lane_mask;
 }
 
-__device__ inline bool quarter_warp_converged()
+template <>
+__device__ inline bool warp_converged<8>()
 {
   auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
   auto shift = lane_id & ~0x7;
@@ -71,11 +74,21 @@ __device__ inline bool quarter_warp_converged()
   return (__activemask() & lane_mask) == lane_mask;
 }
 
-__device__ inline bool eighth_warp_converged()
+template <>
+__device__ inline bool warp_converged<4>()
 {
   auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
   auto shift = lane_id & ~0x3;
   auto lane_mask = 15 << shift;
+  return (__activemask() & lane_mask) == lane_mask;
+}
+
+template <>
+__device__ inline bool warp_converged<2>()
+{
+  auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
+  auto shift = lane_id & ~0x1;
+  auto lane_mask = 4 << shift;
   return (__activemask() & lane_mask) == lane_mask;
 }
 

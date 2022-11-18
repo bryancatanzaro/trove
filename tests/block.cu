@@ -5,6 +5,11 @@
 #include <thrust/device_vector.h>
 #include <thrust/equal.h>
 
+// tile size to use for low-level load/store warp contiguous
+#ifndef TILE_SIZE
+#define TILE_SIZE 32
+#endif
+
 template<typename T, int s>
 __global__ void test_block_write(T* r, int l) {
     typedef trove::array<T, s> s_ary;
@@ -18,7 +23,7 @@ __global__ void test_block_write(T* r, int l) {
         if (trove::warp_converged()) {
             //Warp converged, indices are contiguous, so we call the
             //fast store            
-            trove::store_array_warp_contiguous(r, index, d);
+            trove::store_array_warp_contiguous<s, TILE_SIZE>(r, index, d);
         } else {
             //Warp is not converged, call the slow store.
             trove::store_array(r, index, d);
@@ -38,7 +43,7 @@ __global__ void test_block_copy(const T* x, T* r, int l) {
         if (trove::warp_converged()) {
             //Warp converged, indices are contiguous, call the fast
             //load and store
-            s_ary d = trove::load_array_warp_contiguous<s>(x, index);
+            s_ary d = trove::load_array_warp_contiguous<s, TILE_SIZE>(x, index);
             trove::store_array_warp_contiguous(r, index, d);
         } else {
             //Warp not converged, call the slow load and store

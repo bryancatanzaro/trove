@@ -48,16 +48,20 @@ struct coalesced_ref {
         if (warp_converged()) {
             T data = detail::load_dispatch(other.m_ptr);
             detail::store_dispatch(data, m_ptr);
-        } else if (half_warp_converged()) {
+        } else if (warp_converged<WARP_SIZE/2>()) {
             auto tile = thread_tile<WARP_SIZE/2>();
             T data = detail::load_dispatch(other.m_ptr, tile);
             detail::store_dispatch(data, m_ptr, tile);
-        } else if (quarter_warp_converged()) {
+        } else if (warp_converged<WARP_SIZE/4>()) {
             auto tile = thread_tile<WARP_SIZE/4>();
             T data = detail::load_dispatch(other.m_ptr, tile);
             detail::store_dispatch(data, m_ptr, tile);
-        } else if (eighth_warp_converged()) {
+        } else if (warp_converged<WARP_SIZE/8>()) {
             auto tile = thread_tile<WARP_SIZE/8>();
+            T data = detail::load_dispatch(other.m_ptr, tile);
+            detail::store_dispatch(data, m_ptr, tile);
+        } else if (warp_converged<WARP_SIZE/16>()) {
+            auto tile = thread_tile<WARP_SIZE/16>();
             T data = detail::load_dispatch(other.m_ptr, tile);
             detail::store_dispatch(data, m_ptr, tile);
         } else {

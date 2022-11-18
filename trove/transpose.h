@@ -513,12 +513,12 @@ struct c2r_warp_transpose_impl<Array, Indices, composite> {
                                 const Indices& indices,
                                 const int& rotation,
                                 const Tile &tile) {
-        int warp_id = tile.id;
+        int warp_id = tile.id();
         int pre_rotation = warp_id >> static_log<tile.size()/static_gcd<Array::size, tile.size()>::value>::value;
         src = rotate(src, pre_rotation);
         detail::warp_shuffle<Array, Indices>::impl(src, indices, tile);
         src = rotate(src, rotation);
-        src = composite_c2r_tx_permute(src);
+        src = composite_c2r_tx_permute<Tile>(src);
     }
 };
 
@@ -617,7 +617,7 @@ struct r2c_warp_transpose_impl<Array, Indices, composite> {
                                 const Tile &tile) {
         constexpr int c = static_gcd<Array::size, Tile::size()>::value;
         int warp_id = tile.id();
-        src = composite_r2c_tx_permute(src);
+        src = composite_r2c_tx_permute<Tile>(src);
         src = rotate(src, rotation);
         detail::warp_shuffle<Array, Indices>::impl(src, indices, tile);
         src = rotate(src, size - (warp_id/(Tile::size()/c)));
