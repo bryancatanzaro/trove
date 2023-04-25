@@ -88,7 +88,7 @@ __device__ inline bool warp_converged<2>()
 {
   auto lane_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & 31;
   auto shift = lane_id & ~0x1;
-  auto lane_mask = 4 << shift;
+  auto lane_mask = 3 << shift;
   return (__activemask() & lane_mask) == lane_mask;
 }
 
